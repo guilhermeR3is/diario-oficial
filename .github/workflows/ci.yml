@@ -25,5 +25,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
+      # os testes de extração chamam o pdftotext
+      - run: sudo apt-get update && sudo apt-get install --yes poppler-utils
       - run: pnpm test
       - run: pnpm build
