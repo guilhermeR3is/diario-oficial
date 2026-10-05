@@ -1,22 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { stripPageFooter } from "./page-footer";
+import { loadFixtures } from "./test-fixtures";
 
-type EditionFixture = {
-  title: string;
-  date: string;
-  contentHash: string;
-  pages: string[];
-};
-
-const fixturesDir = fileURLToPath(new URL("./fixtures/", import.meta.url));
-const fixtures = readdirSync(fixturesDir)
-  .filter((file) => file.endsWith(".json"))
-  .map((file) => ({
-    file,
-    ...(JSON.parse(readFileSync(fixturesDir + file, "utf8")) as EditionFixture),
-  }));
+const fixtures = loadFixtures();
 
 describe("edition fixtures", () => {
   it("has the ten editions chosen for the segmenter", () => {
