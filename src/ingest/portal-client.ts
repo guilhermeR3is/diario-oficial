@@ -117,5 +117,21 @@ export function createPortalClient({
     return editions;
   }
 
-  return { listEditions };
+  async function downloadPdf(pdfUrl: string): Promise<Uint8Array> {
+    const url = new URL(pdfUrl);
+    if (url.origin !== PORTAL_URL) {
+      throw new PortalError(`Refusing to download from ${url.origin}`);
+    }
+
+    const bytes = new Uint8Array(await (await get(url)).arrayBuffer());
+    // uma página de erro com status 200 não pode virar uma edição
+    if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") {
+      throw new PortalError(`Response for ${url.pathname} is not a PDF`);
+    }
+    return bytes;
+  }
+
+  return { listEditions, downloadPdf };
 }
+
+export type PortalClient = ReturnType<typeof createPortalClient>;

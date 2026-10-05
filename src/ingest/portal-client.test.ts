@@ -6,6 +6,7 @@ import {
   normalizeTitle,
   PortalError,
 } from "./portal-client";
+import { buildPdf } from "./test-pdf";
 
 const range = { from: "2026-07-01", to: "2026-09-30" };
 const respondWith =
@@ -112,6 +113,54 @@ describe("listEditions", () => {
       name: PortalError.name,
       status: 522,
     });
+  });
+});
+
+describe("downloadPdf", () => {
+  const pdfUrl = "https://diariooficial.saoluis.ma.gov.br/uploads/230.pdf";
+  const answerWith =
+    (body: BodyInit, status = 200) =>
+    async () =>
+      new Response(body, { status });
+
+  it("returns the bytes of the PDF", async () => {
+    const client = createPortalClient({
+      fetchFn: answerWith(buildPdf(2)),
+      minIntervalMs: 0,
+    });
+
+    expect(await client.downloadPdf(pdfUrl)).toEqual(buildPdf(2));
+  });
+
+  it("rejects a 200 answer that is not a PDF", async () => {
+    const client = createPortalClient({
+      fetchFn: answerWith("<html>Erro</html>"),
+      minIntervalMs: 0,
+    });
+
+    await expect(client.downloadPdf(pdfUrl)).rejects.toThrow(/not a PDF/);
+  });
+
+  it("raises the HTTP status when the file is missing", async () => {
+    const client = createPortalClient({
+      fetchFn: answerWith("nada", 404),
+      minIntervalMs: 0,
+    });
+
+    await expect(client.downloadPdf(pdfUrl)).rejects.toMatchObject({
+      name: "PortalError",
+      status: 404,
+    });
+  });
+
+  it("refuses to download from another host", async () => {
+    const fetchFn = vi.fn<typeof fetch>(answerWith(buildPdf(1)));
+    const client = createPortalClient({ fetchFn, minIntervalMs: 0 });
+
+    await expect(
+      client.downloadPdf("https://example.com/edicao.pdf"),
+    ).rejects.toThrow(/Refusing to download/);
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });
 
