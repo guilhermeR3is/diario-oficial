@@ -6,6 +6,9 @@ export default defineConfig({
   },
   test: {
     // env.ts valida process.env ao ser importado; este valor só serve para o import não falhar
-    env: { DATABASE_URL: "postgresql://localhost:5432/test" },
+    env: {
+      DATABASE_URL: "postgresql://localhost:5432/test",
+      LOG_LEVEL: "silent",
+    },
   },
 });

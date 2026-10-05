@@ -1,5 +1,8 @@
 allowBuilds:
   "@prisma/engines": true
+  cpu-features: false
   prisma: false
+  protobufjs: false
   sharp: false
+  ssh2: false
   unrs-resolver: false
