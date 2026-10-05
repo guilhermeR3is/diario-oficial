@@ -6,3 +6,39 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum EditionStatus {
+  PENDING
+  PROCESSED
+  FAILED
+
+  @@map("edition_status")
+}
+
+model Territory {
+  id       Int       @id @default(autoincrement())
+  ibgeCode String    @unique @map("ibge_code")
+  name     String
+  uf       String
+  editions Edition[]
+
+  @@map("territory")
+}
+
+model Edition {
+  id            Int           @id @default(autoincrement())
+  territoryId   Int           @map("territory_id")
+  territory     Territory     @relation(fields: [territoryId], references: [id])
+  title         String
+  date          DateTime      @db.Date
+  sourceUrl     String        @unique @map("source_url")
+  contentHash   String?       @map("content_hash")
+  pageCount     Int?          @map("page_count")
+  status        EditionStatus @default(PENDING)
+  failureReason String?       @map("failure_reason")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@index([territoryId, date])
+  @@map("edition")
+}
