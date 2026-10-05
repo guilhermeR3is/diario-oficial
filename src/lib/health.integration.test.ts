@@ -1,33 +1,21 @@
-import { execFileSync } from "node:child_process";
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from "@testcontainers/postgresql";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { startTestDatabase } from "@/test/database";
 import { createDb } from "./db";
 import { buildHealthReport } from "./health";
 
 const meta = { version: "0.0.0-test", commit: "abc123", liveMode: false };
 
 describe("buildHealthReport", () => {
-  let container: StartedPostgreSqlContainer;
+  let testDb: Awaited<ReturnType<typeof startTestDatabase>>;
   let db: ReturnType<typeof createDb>;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer("pgvector/pgvector:pg17").start();
-    const url = container.getConnectionUri();
-
-    // dotenv não sobrescreve variáveis já definidas, então o prisma.config.ts usa esta URL
-    execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], {
-      env: { ...process.env, DATABASE_URL: url },
-      stdio: "pipe",
-    });
-    db = createDb(url);
+    testDb = await startTestDatabase();
+    db = testDb.db;
   }, 180_000);
 
   afterAll(async () => {
-    await db?.$disconnect();
-    await container?.stop();
+    await testDb?.stop();
   });
 
   it("reports ok when the database answers and pgvector is installed", async () => {

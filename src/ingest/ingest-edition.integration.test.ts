@@ -1,11 +1,6 @@
-import { execFileSync } from "node:child_process";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from "@testcontainers/postgresql";
 import {
   afterAll,
   beforeAll,
@@ -15,7 +10,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { createDb } from "@/lib/db";
+import { startTestDatabase } from "@/test/database";
 import { ingestEdition } from "./ingest-edition";
 import type { PortalEdition } from "./portal-client";
 import { buildPdf } from "./test-pdf";
@@ -27,22 +22,16 @@ const edition: PortalEdition = {
 };
 
 describe("ingestEdition", () => {
-  let container: StartedPostgreSqlContainer;
-  let db: ReturnType<typeof createDb>;
+  let testDb: Awaited<ReturnType<typeof startTestDatabase>>;
+  let db: typeof testDb.db;
   let territoryId: number;
   let tempRoot: string;
   let pdfDir: string;
 
   beforeAll(async () => {
     tempRoot = await mkdtemp(path.join(tmpdir(), "ingest-test-"));
-    container = await new PostgreSqlContainer("pgvector/pgvector:pg17").start();
-    const url = container.getConnectionUri();
-
-    execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], {
-      env: { ...process.env, DATABASE_URL: url },
-      stdio: "pipe",
-    });
-    db = createDb(url);
+    testDb = await startTestDatabase();
+    db = testDb.db;
     territoryId = (
       await db.territory.create({
         data: { ibgeCode: "2111300", name: "São Luís", uf: "MA" },
@@ -56,8 +45,7 @@ describe("ingestEdition", () => {
   });
 
   afterAll(async () => {
-    await db?.$disconnect();
-    await container?.stop();
+    await testDb?.stop();
     await rm(tempRoot, { recursive: true, force: true });
   });
 

@@ -104,7 +104,7 @@ São Luís (2111300) está lá, com `https://api.queridodiario.org.br`, mas a co
 - **Termos de uso: não verificado.** Não há `robots.txt` (404) nem página de termos. Decisão do usuário: não entrar em contato com o portal. Mantemos o uso leve (uma chamada por segundo, `User-Agent` identificado, só GET, só os endpoints públicos que o site usa).
 - API sem contrato: pode mudar sem aviso. Se a ingestão quebrar, refazer os testes acima.
 - Não sei se o acervo legacy de jul–set recebe correções depois (edições substituídas). Para a ingestão, o `contentHash` do PDF do plano cobre isso.
-- Não testei o rate limit real do servidor.
+- Não testei o rate limit real do servidor. A ingestão de jul–set fez 76 requisições em 75 s (uma por segundo) e não houve nenhum erro; baixar a mesma edição duas vezes deu bytes idênticos nas 75.
 - `pdftotext` (Poppler): a lista de programas da imagem `ubuntu-24.04` do GitHub Actions (versão 20260927) **não o cita**; não sei se a lista é completa. Na Vercel não é necessário, porque a ingestão roda no computador do usuário. Usando `unpdf` o problema some.
 
 ## Espaço no banco (medido em Postgres 17 + pgvector 0.8 de teste, 6.437 trechos de ~2.500 caracteres)
