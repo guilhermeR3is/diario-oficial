@@ -2,7 +2,8 @@ import { z } from "zod";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "@/embedding/model";
 import { logger } from "@/lib/logger";
 import type { PrismaClient } from "../../generated/prisma/client";
-import { searchChunks, type SearchHit } from "./search-chunks";
+import { searchChunks } from "./search-chunks";
+import type { SearchHit } from "./search-hit";
 
 const RESULT_LIMIT = 10;
 
