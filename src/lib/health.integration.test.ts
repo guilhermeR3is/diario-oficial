@@ -29,7 +29,8 @@ describe("buildHealthReport", () => {
   });
 
   it("reports degraded when the vector extension is missing", async () => {
-    await db.$executeRawUnsafe("DROP EXTENSION vector");
+    // o CASCADE leva junto a coluna chunk.embedding; o banco deste arquivo é descartável
+    await db.$executeRawUnsafe("DROP EXTENSION vector CASCADE");
 
     try {
       const report = await buildHealthReport(db, meta);

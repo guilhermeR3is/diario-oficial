@@ -47,19 +47,22 @@ model Edition {
 }
 
 model Chunk {
-  id          Int      @id @default(autoincrement())
-  editionId   Int      @map("edition_id")
-  edition     Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
-  ordinal     Int
-  actType     String   @map("act_type")
-  title       String
-  secretariat String?
-  date        DateTime @db.Date
-  page        Int
-  pageEnd     Int      @map("page_end")
-  text        String
-  tokenCount  Int      @map("token_count")
-  contentHash String   @map("content_hash")
+  id             Int                         @id @default(autoincrement())
+  editionId      Int                         @map("edition_id")
+  edition        Edition                     @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  ordinal        Int
+  actType        String                      @map("act_type")
+  title          String
+  secretariat    String?
+  date           DateTime                    @db.Date
+  page           Int
+  pageEnd        Int                         @map("page_end")
+  text           String
+  tokenCount     Int                         @map("token_count")
+  contentHash    String                      @map("content_hash")
+  // o Prisma não tem tipo para vetor: a coluna só é lida e escrita por SQL puro
+  embedding      Unsupported("vector(768)")?
+  embeddingModel String?                     @map("embedding_model")
 
   @@unique([editionId, ordinal])
   @@map("chunk")
