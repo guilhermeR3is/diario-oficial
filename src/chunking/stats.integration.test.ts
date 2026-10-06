@@ -11,9 +11,12 @@ import {
   insertFixtureEdition,
   loadFixtures,
   pagesFromStandIn,
+  withBrokenTitle,
 } from "./test-fixtures";
 
-const fixtures = loadFixtures();
+const fixtures = loadFixtures().map((fixture) =>
+  fixture.file === "edition-157.json" ? withBrokenTitle(fixture) : fixture,
+);
 const fixtureOf = (file: string) => fixtures.find((f) => f.file === file)!;
 const chunked = [
   "edition-157.json",

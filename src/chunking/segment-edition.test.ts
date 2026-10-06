@@ -252,6 +252,80 @@ describe("segmentEdition", () => {
     ]);
   });
 
+  it("finds a title that the line wrap broke after a hyphen or inside a word", () => {
+    const hyphen = "TERMO AO CONTRATO N.º 52/2023-GAB/SEMIT";
+    const longWord = "PORTARIA CONJUNTA - SEMUSC/SEPLAN/INCID";
+    const pages = edition(
+      index([hyphen, 2], [longWord, 2]),
+      lines(
+        "TERMO AO CONTRATO N.º 52/2023-",
+        "GAB/SEMIT",
+        "texto",
+        signed(1),
+        "PORTARIA CONJUNTA -",
+        "SEMUSC/SEPLAN/I",
+        "NCID",
+        "texto",
+        signed(2),
+      ),
+    );
+
+    const { acts, problems } = segmentEdition(pages);
+
+    expect(problems).toEqual([]);
+    expect(acts.map((act) => act.title)).toEqual([hyphen, longWord]);
+  });
+
+  it("finds a section header split across two pages and keeps its tail out of the next act", () => {
+    const header = "SECRETARIA MUNICIPAL DA CRIANÇA - SEMCAS";
+    const pages = edition(
+      index(
+        ["PORTARIA N.º 1/2026", 2],
+        [header, 2],
+        ["PORTARIA N.º 2/2026", 3],
+      ),
+      lines(
+        "PORTARIA N.º 1/2026",
+        "texto",
+        signed(1),
+        "SECRETARIA MUNICIPAL DA CRIANÇA -",
+      ),
+      lines("SEMCAS", "PORTARIA N.º 2/2026", "texto", signed(2)),
+    );
+
+    const { acts, problems } = segmentEdition(pages);
+
+    expect(problems).toEqual([]);
+    expect(acts.map((act) => [act.title, act.section])).toEqual([
+      ["PORTARIA N.º 1/2026", null],
+      ["PORTARIA N.º 2/2026", header],
+    ]);
+    expect(acts[0]!.parts.map((part) => part.text).join("\n")).not.toContain(
+      "CRIANÇA",
+    );
+    expect(acts[1]!.parts[0]!.text.startsWith("PORTARIA N.º 2/2026")).toBe(
+      true,
+    );
+  });
+
+  it("prefers the declared page over a repeat of the title inside the previous act", () => {
+    const pages = edition(
+      index(["EDITAL DE ABERTURA N.º 1", 2], ["EDITAL N.º 1", 3]),
+      lines("EDITAL DE ABERTURA N.º 1", "EDITAL N.º 1", "texto"),
+      lines("fim do primeiro", signed(1), "EDITAL N.º 1", "texto", signed(2)),
+    );
+
+    const { acts, problems } = segmentEdition(pages);
+
+    expect(problems).toEqual([]);
+    expect(
+      acts.map((act) => [act.title, act.parts.map((part) => part.page)]),
+    ).toEqual([
+      ["EDITAL DE ABERTURA N.º 1", [2, 3]],
+      ["EDITAL N.º 1", [3]],
+    ]);
+  });
+
   it("keeps an act that has no identifier code and reports it", () => {
     const pages = edition(
       index(["PORTARIA N.º 1/2026", 2], ["EXTRATO DO CONTRATO N.º 7/2026", 2]),
@@ -329,10 +403,12 @@ describe("segmentEdition", () => {
 
 const EXPECTED_FIXTURES: Record<string, { acts: number; problems: string[] }> =
   {
-    "edition-157.json": { acts: 94, problems: ["title-not-found"] },
+    "edition-157.json": { acts: 94, problems: [] },
     "edition-160.json": { acts: 1, problems: [] },
-    "edition-162.json": { acts: 77, problems: ["title-not-found"] },
+    "edition-162.json": { acts: 77, problems: [] },
     "edition-165.json": { acts: 2, problems: [] },
+    "edition-167.json": { acts: 60, problems: [] },
+    "edition-172.json": { acts: 69, problems: [] },
     "edition-190.json": { acts: 1, problems: [] },
     "edition-196.json": { acts: 89, problems: [] },
     "edition-201.json": { acts: 89, problems: [] },

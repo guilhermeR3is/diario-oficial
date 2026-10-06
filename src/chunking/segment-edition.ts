@@ -25,7 +25,13 @@ export type Segmentation = {
   problems: SegmentationProblem[];
 };
 
-type Position = { pageIndex: number; start: number; end: number };
+// um título pode começar numa página e terminar na seguinte
+type Position = {
+  pageIndex: number;
+  start: number;
+  endPageIndex: number;
+  end: number;
+};
 
 const IDENTIFIER_CODE = /Código identificador:/g;
 // créditos da edição, na última página; se ficassem, entrariam no texto do último ato
@@ -33,9 +39,15 @@ const COLOPHON = /^EXPEDIENTE\s*\n\s*PREFEITURA DE SÃO LUÍS[\s\S]*$/m;
 // marcadores de órgão do índice ("ÍNDICE - PUBLICAÇÕES DE TERCEIROS") aparecem no corpo sem o prefixo
 const INDEX_PREFIX = /^ÍNDICE\s*-\s*/;
 
+// o PDF quebra a linha até no meio de uma palavra comprida ("SEMMAM/I\nNCID"), então toleramos espaço entre letras
 function titlePattern(title: string): RegExp {
-  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(escaped.replace(/\s+/g, "\\s+"), "g");
+  const words = title.trim().split(/\s+/);
+  const escaped = words.map((word) =>
+    [...word]
+      .map((char) => char.replace(/[.*+?^${}()|[\]\\]/, "\\$&"))
+      .join("\\s*"),
+  );
+  return new RegExp(escaped.join("\\s+"), "g");
 }
 
 // O mesmo texto aparece dentro de atos ("lotada na\nSECRETARIA ... - SEMUS, após..."), então o título
@@ -60,7 +72,7 @@ function isTitleBoundary(
   );
 }
 
-// o índice cita a página impressa; aceitamos uma de folga para cada lado
+// o índice cita a página impressa (uma de folga para cada lado); a citada vem primeiro para um título repetido no ato anterior não vencer
 function locateTitle(
   bodies: string[],
   title: string,
@@ -70,22 +82,45 @@ function locateTitle(
 ): Position | null {
   const pattern = titlePattern(title);
   const next = nextTitle === null ? null : titlePattern(nextTitle);
-  const first = Math.max(cursor.pageIndex, page - 2);
-  const last = Math.min(bodies.length - 1, page);
+  const candidates = [page - 1, page - 2, page].filter(
+    (pageIndex) =>
+      pageIndex >= cursor.endPageIndex && pageIndex < bodies.length,
+  );
 
-  for (let pageIndex = first; pageIndex <= last; pageIndex++) {
-    const text = bodies[pageIndex]!;
-    const cursorEnd = pageIndex === cursor.pageIndex ? cursor.end : null;
+  const search = (pageIndex: number, text: string): Position | null => {
+    const cursorEnd = pageIndex === cursor.endPageIndex ? cursor.end : null;
     pattern.lastIndex = cursorEnd ?? 0;
     for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
-      if (isTitleBoundary(text, match, cursorEnd, next)) {
+      if (!isTitleBoundary(text, match, cursorEnd, next)) continue;
+      const pageLength = bodies[pageIndex]!.length;
+      const end = match.index + match[0].length;
+      if (end <= pageLength) {
+        return { pageIndex, start: match.index, endPageIndex: pageIndex, end };
+      }
+      if (match.index < pageLength) {
         return {
           pageIndex,
           start: match.index,
-          end: match.index + match[0].length,
+          endPageIndex: pageIndex + 1,
+          end: end - pageLength - 1,
         };
       }
     }
+    return null;
+  };
+
+  for (const pageIndex of candidates) {
+    const position = search(pageIndex, bodies[pageIndex]!);
+    if (position) return position;
+  }
+  // cabeçalho partido na virada de página (edição 172: "... ASSISTÊNCIA SOCIAL -" e, na outra, "SEMCAS")
+  for (const pageIndex of candidates) {
+    if (pageIndex + 1 >= bodies.length) continue;
+    const position = search(
+      pageIndex,
+      `${bodies[pageIndex]!}\n${bodies[pageIndex + 1]!}`,
+    );
+    if (position) return position;
   }
   return null;
 }
@@ -130,7 +165,12 @@ export function segmentEdition(pages: string[]): Segmentation {
   }
 
   const located: { title: string; page: number; position: Position }[] = [];
-  let cursor: Position = { pageIndex: index.pageCount, start: 0, end: 0 };
+  let cursor: Position = {
+    pageIndex: index.pageCount,
+    start: 0,
+    endPageIndex: index.pageCount,
+    end: 0,
+  };
   for (const [i, item] of index.items.entries()) {
     const title = item.title.replace(INDEX_PREFIX, "");
     const nextTitle = index.items[i + 1]?.title.replace(INDEX_PREFIX, "");
@@ -159,7 +199,8 @@ export function segmentEdition(pages: string[]): Segmentation {
     );
     const text = parts.map((part) => part.text).join("\n");
     const codes = text.match(IDENTIFIER_CODE)?.length ?? 0;
-    const afterTitle = text.slice(position.end - position.start).trim();
+    const titleEnd = new RegExp(`^${titlePattern(title).source}`).exec(text);
+    const afterTitle = text.slice(titleEnd?.[0].length ?? 0).trim();
 
     // cabeçalho de secretaria: não tem código e nada além do título
     if (codes === 0 && afterTitle === "") {

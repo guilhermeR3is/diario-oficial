@@ -24,6 +24,18 @@ export function loadFixtures(): EditionFixture[] {
     }));
 }
 
+// a 157 já segmenta sem problema; mudar o ano do título de uma página a devolve ao caso "título não achado" (página 23)
+export function withBrokenTitle(fixture: EditionFixture): EditionFixture {
+  return {
+    ...fixture,
+    pages: fixture.pages.map((page, index) =>
+      index === 22
+        ? page.replace("52/2023-\nGAB/SEMIT", "52/2024-\nGAB/SEMIT")
+        : page,
+    ),
+  };
+}
+
 export function insertFixtureEdition(
   db: PrismaClient,
   territoryId: number,

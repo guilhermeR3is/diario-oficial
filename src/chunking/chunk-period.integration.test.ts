@@ -19,9 +19,12 @@ import {
   loadFixtures,
   pagesFromStandIn,
   type EditionFixture,
+  withBrokenTitle,
 } from "./test-fixtures";
 
-const fixtures = loadFixtures();
+const fixtures = loadFixtures().map((fixture) =>
+  fixture.file === "edition-157.json" ? withBrokenTitle(fixture) : fixture,
+);
 const fixtureOf = (file: string) => fixtures.find((f) => f.file === file)!;
 const suspect = fixtureOf("edition-157.json"); // 2026-07-02
 const julyEdition = fixtureOf("edition-165.json"); // 2026-07-10

@@ -5,8 +5,8 @@ import { loadFixtures } from "./test-fixtures";
 const fixtures = loadFixtures();
 
 describe("edition fixtures", () => {
-  it("has the ten editions chosen for the segmenter", () => {
-    expect(fixtures).toHaveLength(10);
+  it("has the twelve editions chosen for the segmenter", () => {
+    expect(fixtures).toHaveLength(12);
   });
 
   describe.each(fixtures)("$file", (fixture) => {

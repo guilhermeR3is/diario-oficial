@@ -33,6 +33,20 @@ const EDITIONS = [
       "32c1beb1e878bec7a0a663f28ac136962eaed60e54dc03d18023d1f42e44196d",
   },
   {
+    number: 167,
+    date: "2026-07-14",
+    title: "Diário Oficial - Edição nº 167/XLVI",
+    contentHash:
+      "a00c5b40fbfb1ebeb05e4c082f71be25c91ede466806409816598f8ecb5599b1",
+  },
+  {
+    number: 172,
+    date: "2026-07-21",
+    title: "Diário Oficial - Edição nº 172/XLVI",
+    contentHash:
+      "1bc6820b0e080942de7663a5b2f49e84364e52de8db59047de8c595bf6becd03",
+  },
+  {
     number: 190,
     date: "2026-08-13",
     title: "Diário Oficial - Edição nº 190/XLVI - Extra",
