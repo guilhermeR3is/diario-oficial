@@ -36,6 +36,8 @@ model Edition {
   pageCount     Int?          @map("page_count")
   status        EditionStatus @default(PENDING)
   failureReason String?       @map("failure_reason")
+  // null enquanto a edição não foi cortada em trechos; [] quando o corte não achou problema
+  chunkProblems Json?         @map("chunk_problems")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   chunks        Chunk[]

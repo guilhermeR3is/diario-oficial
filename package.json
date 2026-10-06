@@ -16,6 +16,8 @@
     "db:down": "docker compose down",
     "db:migrate": "prisma migrate dev",
     "ingest": "tsx src/ingest/cli.ts",
+    "chunk": "tsx src/chunking/cli.ts",
+    "chunk:stats": "tsx src/chunking/stats-cli.ts",
     "chunking:fixtures": "tsx src/chunking/save-fixtures.ts"
   },
   "dependencies": {
