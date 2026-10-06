@@ -38,7 +38,27 @@ model Edition {
   failureReason String?       @map("failure_reason")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+  chunks        Chunk[]
 
   @@index([territoryId, date])
   @@map("edition")
+}
+
+model Chunk {
+  id          Int      @id @default(autoincrement())
+  editionId   Int      @map("edition_id")
+  edition     Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  ordinal     Int
+  actType     String   @map("act_type")
+  title       String
+  secretariat String?
+  date        DateTime @db.Date
+  page        Int
+  pageEnd     Int      @map("page_end")
+  text        String
+  tokenCount  Int      @map("token_count")
+  contentHash String   @map("content_hash")
+
+  @@unique([editionId, ordinal])
+  @@map("chunk")
 }
