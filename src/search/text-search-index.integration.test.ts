@@ -123,6 +123,19 @@ describe("chunk text search column", () => {
       ]);
     });
 
+    it("fills the column when the search_path is empty, as in a pg_restore", async () => {
+      const filled = await db.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL search_path = ''`;
+        await tx.$executeRaw`
+          INSERT INTO public.chunk (edition_id, ordinal, act_type, title, date, page, page_end, text, token_count, content_hash)
+          VALUES (${editionId}, 0, 'PORTARIA', 'PORTARIA', '2026-09-30', 1, 1, 'PORTARIA Nº 1.286/2026', 6, 'hash-da-edicao')`;
+        return tx.$queryRaw<{ filled: boolean }[]>`
+          SELECT tsv IS NOT NULL AS filled FROM public.chunk`;
+      });
+
+      expect(filled).toEqual([{ filled: true }]);
+    });
+
     it("refreshes the column when the text changes", async () => {
       const { id } = await createChunk("licitação de merenda escolar");
 
