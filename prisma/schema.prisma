@@ -63,7 +63,10 @@ model Chunk {
   // o Prisma não tem tipo para vetor: a coluna só é lida e escrita por SQL puro
   embedding      Unsupported("vector(768)")?
   embeddingModel String?                     @map("embedding_model")
+  // preenchida pelo trigger chunk_fill_tsv; o Prisma só precisa conhecer a coluna e o índice
+  tsv            Unsupported("tsvector")?
 
   @@unique([editionId, ordinal])
+  @@index([tsv], type: Gin)
   @@map("chunk")
 }
