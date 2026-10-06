@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { parseEmbedArgs } from "./args";
 import { embedChunks } from "./embed-chunks";
-import { EMBEDDING_MODEL, loadEmbedder } from "./gte-embedder";
+import { loadEmbedder } from "./gte-embedder";
+import { EMBEDDING_MODEL } from "./model";
 
 async function main() {
   const { force, limit } = parseEmbedArgs(process.argv.slice(2));
