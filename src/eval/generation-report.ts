@@ -98,7 +98,7 @@ export function summarizeGeneration(
   };
 }
 
-const snippet = (text: string) => {
+export const snippet = (text: string) => {
   const oneLine = text.replace(/\s+/g, " ").trim();
   return oneLine.length > 100 ? `${oneLine.slice(0, 100)}...` : oneLine;
 };

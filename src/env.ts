@@ -10,6 +10,7 @@ const envSchema = z
       .optional()
       .transform((value) => value?.trim() || undefined),
     GENERATION_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
+    FIDELITY_MODEL: z.string().min(1).default("qwen/qwen3.8-27b"),
     VERCEL_GIT_COMMIT_SHA: z.string().optional(),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])

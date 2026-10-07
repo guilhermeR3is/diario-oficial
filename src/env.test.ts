@@ -30,6 +30,14 @@ describe("parseEnv", () => {
     expect(parseEnv(validSource).GENERATION_MODEL).toBe("openai/gpt-oss-120b");
   });
 
+  it("uses qwen3.8 on Groq as the faithfulness verifier unless another is chosen", () => {
+    expect(parseEnv(validSource).FIDELITY_MODEL).toBe("qwen/qwen3.8-27b");
+    expect(
+      parseEnv({ ...validSource, FIDELITY_MODEL: "outro/verificador" })
+        .FIDELITY_MODEL,
+    ).toBe("outro/verificador");
+  });
+
   it("does not need the Groq key while live mode is off", () => {
     expect(parseEnv(validSource).GROQ_API_KEY).toBeUndefined();
   });

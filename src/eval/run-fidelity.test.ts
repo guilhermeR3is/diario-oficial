@@ -5,7 +5,7 @@ import { FIDELITY_PROMPT_VERSION } from "./fidelity-prompt";
 import type { FidelityResult } from "./fidelity-result";
 import type { GenerationResult } from "./generation-result";
 import type { ChunkKey } from "./questions";
-import { checkFidelity, pendingFidelity } from "./run-fidelity";
+import { checkFidelity, currentChecks, pendingFidelity } from "./run-fidelity";
 
 const key = (ordinal: number): ChunkKey => ({
   sourceUrl: "https://exemplo.test/a.pdf",
@@ -385,5 +385,60 @@ describe("pendingFidelity", () => {
     pendingFidelity(generations, [], current);
 
     expect(generations.map((g) => g.id)).toEqual(before);
+  });
+});
+
+describe("currentChecks", () => {
+  const current = { verifier: "fake", promptVersion: FIDELITY_PROMPT_VERSION };
+  const made = (
+    id: string,
+    answer: string,
+    overrides: Partial<FidelityResult> = {},
+  ): FidelityResult => ({
+    id,
+    verifier: "fake",
+    promptVersion: FIDELITY_PROMPT_VERSION,
+    answer,
+    claims: [],
+    ...overrides,
+  });
+  const generations = [generation("q01"), generation("q02")];
+
+  it("keeps the checks made on the answer that is valid now", () => {
+    const checks = [made("q01", generation("q01").answer)];
+
+    expect(
+      currentChecks(generations, checks, current).map((c) => c.id),
+    ).toEqual(["q01"]);
+  });
+
+  it("drops a check made on an answer that was redone since", () => {
+    const checks = [made("q01", "resposta antiga [1]")];
+
+    expect(currentChecks(generations, checks, current)).toEqual([]);
+  });
+
+  it("drops a check from another verifier or prompt version", () => {
+    const checks = [
+      made("q01", generation("q01").answer, { verifier: "outro" }),
+      made("q02", generation("q02").answer, { promptVersion: "v0" }),
+    ];
+
+    expect(currentChecks(generations, checks, current)).toEqual([]);
+  });
+
+  it("uses the latest check of a question", () => {
+    const checks = [
+      made("q01", "resposta antiga [1]"),
+      made("q01", generation("q01").answer),
+    ];
+
+    expect(currentChecks(generations, checks, current)).toHaveLength(1);
+  });
+
+  it("ignores a check of a question that has no answer now", () => {
+    const checks = [made("q09", "qualquer coisa")];
+
+    expect(currentChecks(generations, checks, current)).toEqual([]);
   });
 });

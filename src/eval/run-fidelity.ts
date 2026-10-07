@@ -20,7 +20,7 @@ import { splitClaims } from "./split-claims";
 // entrada medida nas 24 respostas reais (média de 1,5 mil tokens) mais ~500 de saída e raciocínio do verificador, estimados
 export const TOKENS_PER_CHECK = 2_000;
 
-const NO_SOURCE_REASON = "sem citação válida";
+export const NO_SOURCE_REASON = "sem citação válida";
 
 // uma segunda tentativa cobre o JSON malformado, que é o erro comum de quem devolve texto livre
 const ATTEMPTS = 2;
@@ -29,6 +29,19 @@ export type FidelityDeps = {
   verifier: AnswerModel;
   textOf: (key: ChunkKey) => string | undefined;
 };
+
+// só vale a conferência feita sobre a resposta que está valendo agora
+export function currentChecks(
+  generations: GenerationResult[],
+  checks: FidelityResult[],
+  current: { verifier: string; promptVersion: string },
+): FidelityResult[] {
+  const latest = latestFidelity(checks, current);
+  return generations.flatMap((generation) => {
+    const check = latest.get(generation.id);
+    return check && check.answer === generation.answer ? [check] : [];
+  });
+}
 
 export function pendingFidelity(
   generations: GenerationResult[],
@@ -46,12 +59,13 @@ export function pendingFidelity(
     );
   }
 
-  const checked = latestFidelity(checks, current);
+  const checked = new Set(
+    currentChecks(answered, checks, current).map((check) => check.id),
+  );
   const pending = answered
     .filter(
       (generation) =>
-        redo.includes(generation.id) ||
-        checked.get(generation.id)?.answer !== generation.answer,
+        redo.includes(generation.id) || !checked.has(generation.id),
     )
     .sort((a, b) => a.id.localeCompare(b.id));
   return limit === undefined ? pending : pending.slice(0, limit);
