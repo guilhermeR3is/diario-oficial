@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prompt } from "./build-prompt";
 import { createGroqAnswerModel } from "./groq-answer-model";
+import { parseCitations } from "./parse-citations";
 
 const { create, clientCreated, logInfo } = vi.hoisted(() => ({
   create: vi.fn(),
@@ -172,5 +173,58 @@ describe("createGroqAnswerModel", () => {
     // "closed" sozinho também seria verdadeiro se o stream fosse lido até o fim antes
     expect(produced).toBe(1);
     expect(closed).toBe(true);
+  });
+
+  describe("plain typography", () => {
+    const code = (point: number) => String.fromCodePoint(point);
+    const LEFT = code(0x3010);
+    const RIGHT = code(0x3011);
+
+    async function written(...pieces: string[]) {
+      create.mockResolvedValue(
+        chunks(...pieces.map((piece) => chunk(piece)), chunk(null, "stop")),
+      );
+      return collect(model().stream(prompt));
+    }
+
+    it("turns the lenticular brackets the model likes into square brackets", async () => {
+      const pieces = await written(`Fato${LEFT}1${RIGHT}${LEFT}4${RIGHT}.`);
+
+      expect(pieces.join("")).toBe("Fato[1][4].");
+    });
+
+    it("works piece by piece, so a bracket split by the streaming still ends up square", async () => {
+      const pieces = await written(`Fato${LEFT}`, "12", `${RIGHT}.`);
+
+      expect(pieces).toEqual(["Fato[", "12", "]."]);
+    });
+
+    it("also turns the full-width square brackets into square brackets", async () => {
+      const pieces = await written(`Fato${code(0xff3b)}2${code(0xff3d)}`);
+
+      expect(pieces.join("")).toBe("Fato[2]");
+    });
+
+    it("replaces no-break spaces and the non-breaking hyphen of a CNPJ", async () => {
+      const pieces = await written(
+        `CNPJ 45.734.817/0001${code(0x2011)}21${code(0x202f)}[1]${code(0x00a0)}ok`,
+      );
+
+      expect(pieces.join("")).toBe("CNPJ 45.734.817/0001-21 [1] ok");
+    });
+
+    it("leaves accents, the ordinal sign and ordinary dashes alone", async () => {
+      const text = `nº 56/2026 ${code(0x2014)} João, art. 5º ${code(0x2013)} a-b`;
+
+      expect((await written(text)).join("")).toBe(text);
+    });
+
+    it("gives parseCitations a citation it can read, which is the point of all this", async () => {
+      const pieces = await written(
+        `O convênio é com a entidade${LEFT}1${RIGHT}.`,
+      );
+
+      expect(parseCitations(pieces.join(""), 6).cited).toEqual([1]);
+    });
   });
 });

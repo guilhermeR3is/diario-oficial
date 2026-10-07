@@ -16,7 +16,7 @@ Regras:
 5. Responda em português, em poucas frases, sem copiar o trecho inteiro. Não escreva edição nem página por extenso: o número da fonte já aponta para elas.`;
 
 // o texto de um diário não pode fechar a tag e passar por outra fonte ou por instrução
-const escapeText = (value: string) =>
+export const escapeText = (value: string) =>
   value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

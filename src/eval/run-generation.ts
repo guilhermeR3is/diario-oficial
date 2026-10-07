@@ -7,8 +7,8 @@ import type { EvalQuestion } from "./questions";
 export const DEFAULT_LIMIT = 20;
 export const DEFAULT_PAUSE_SECONDS = 60;
 
-// média medida em 5 chamadas reais (todas recusas, saída de ~35 tokens): 5,4 mil por pergunta; respostas com texto gastam um pouco mais
-export const TOKENS_PER_QUESTION = 5_700;
+// média medida em 15 chamadas reais (5 recusas e 10 respostas): 5,1 mil por pergunta
+export const TOKENS_PER_QUESTION = 5_100;
 
 // duas falhas seguidas indicam cota esgotada ou chave inválida; seguir só gastaria o que resta
 const MAX_CONSECUTIVE_FAILURES = 2;
@@ -18,6 +18,7 @@ export type GenerationArgs = {
   pauseSeconds: number;
   reportOnly: boolean;
   yes: boolean;
+  redo: string[];
 };
 
 export function parseGenerationArgs(args: string[]): GenerationArgs {
@@ -26,6 +27,7 @@ export function parseGenerationArgs(args: string[]): GenerationArgs {
     pauseSeconds: DEFAULT_PAUSE_SECONDS,
     reportOnly: false,
     yes: false,
+    redo: [],
   };
 
   for (const arg of args) {
@@ -33,6 +35,8 @@ export function parseGenerationArgs(args: string[]): GenerationArgs {
     else if (arg === "--yes") parsed.yes = true;
     else if (arg.startsWith("--limit=")) {
       parsed.limit = positiveInteger("--limit", arg.slice("--limit=".length));
+    } else if (arg.startsWith("--redo=")) {
+      parsed.redo = questionIds(arg.slice("--redo=".length));
     } else if (arg.startsWith("--pause-seconds=")) {
       parsed.pauseSeconds = positiveInteger(
         "--pause-seconds",
@@ -40,11 +44,19 @@ export function parseGenerationArgs(args: string[]): GenerationArgs {
       );
     } else {
       throw new Error(
-        `argumento desconhecido "${arg}" (use --limit=N, --pause-seconds=N, --report, --yes)`,
+        `argumento desconhecido "${arg}" (use --limit=N, --pause-seconds=N, --redo=q04,q05, --report, --yes)`,
       );
     }
   }
   return parsed;
+}
+
+function questionIds(text: string): string[] {
+  const ids = text.split(",").map((id) => id.trim());
+  if (ids.some((id) => !/^q\d{2}$/.test(id))) {
+    throw new Error(`--redo deve listar ids como q04,q05 (recebi "${text}")`);
+  }
+  return [...new Set(ids)];
 }
 
 function positiveInteger(name: string, text: string): number {
@@ -61,9 +73,19 @@ export function pendingQuestions(
   questions: EvalQuestion[],
   results: GenerationResult[],
   current: { model: string; promptVersion: string },
-  limit?: number,
+  { limit, redo = [] }: { limit?: number; redo?: string[] } = {},
 ): EvalQuestion[] {
-  const done = latestResults(results, current);
+  const known = new Set(questions.map((question) => question.id));
+  const unknown = redo.filter((id) => !known.has(id));
+  if (unknown.length > 0) {
+    throw new Error(
+      `--redo: ${unknown.join(", ")} não está em eval/questions.jsonl`,
+    );
+  }
+
+  // uma pergunta refeita entra de novo; a linha nova vale mais que a antiga (latestResults)
+  const done = new Set(latestResults(results, current).keys());
+  for (const id of redo) done.delete(id);
   const pending = questions
     .filter((question) => !done.has(question.id))
     // as sem resposta primeiro: são o teste mais importante e cabem na cota do primeiro dia

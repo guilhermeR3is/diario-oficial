@@ -69,6 +69,7 @@ describe("parseGenerationArgs", () => {
       pauseSeconds: DEFAULT_PAUSE_SECONDS,
       reportOnly: false,
       yes: false,
+      redo: [],
     });
     expect(DEFAULT_LIMIT).toBe(20);
     expect(DEFAULT_PAUSE_SECONDS).toBe(60);
@@ -79,11 +80,27 @@ describe("parseGenerationArgs", () => {
       parseGenerationArgs([
         "--limit=5",
         "--pause-seconds=10",
+        "--redo=q04, q05,q04",
         "--report",
         "--yes",
       ]),
-    ).toEqual({ limit: 5, pauseSeconds: 10, reportOnly: true, yes: true });
+    ).toEqual({
+      limit: 5,
+      pauseSeconds: 10,
+      reportOnly: true,
+      yes: true,
+      redo: ["q04", "q05"],
+    });
   });
+
+  it.each(["", "4", "q4", "q04,,q05", "q04;q05", "pergunta"])(
+    "refuses --redo=%s, which would redo nothing or the wrong question",
+    (value) => {
+      expect(() => parseGenerationArgs([`--redo=${value}`])).toThrow(
+        /--redo deve listar ids como q04,q05/,
+      );
+    },
+  );
 
   it.each(["0", "-3", "1.5", "abc", ""])(
     "refuses --limit=%s, which would spend the quota in a way nobody planned",
@@ -153,11 +170,46 @@ describe("pendingQuestions", () => {
   });
 
   it("cuts the batch at the limit after ordering", () => {
-    expect(pendingQuestions(all, [], current, 3).map((q) => q.id)).toEqual([
-      "q36",
-      "q37",
-      "q01",
-    ]);
+    expect(
+      pendingQuestions(all, [], current, { limit: 3 }).map((q) => q.id),
+    ).toEqual(["q36", "q37", "q01"]);
+  });
+
+  it("asks again the questions listed in redo, even though they are done", () => {
+    const results = [
+      savedResult("q36"),
+      savedResult("q01"),
+      savedResult("q02"),
+    ];
+
+    const pending = pendingQuestions(all, results, current, {
+      redo: ["q01", "q36"],
+    });
+
+    expect(pending.map((q) => q.id)).toEqual(["q36", "q37", "q01", "q03"]);
+  });
+
+  it("lets a redone question count toward the limit, in the usual order", () => {
+    const results = [savedResult("q36"), savedResult("q01")];
+
+    const pending = pendingQuestions(all, results, current, {
+      limit: 2,
+      redo: ["q01"],
+    });
+
+    expect(pending.map((q) => q.id)).toEqual(["q37", "q01"]);
+  });
+
+  it("redoing a question that was never asked does not ask it twice", () => {
+    const pending = pendingQuestions(all, [], current, { redo: ["q03"] });
+
+    expect(pending.filter((q) => q.id === "q03")).toHaveLength(1);
+  });
+
+  it("refuses a redo id that is not in the questions file, so a typo is not mistaken for done", () => {
+    expect(() =>
+      pendingQuestions(all, [], current, { redo: ["q99", "q01"] }),
+    ).toThrow("--redo: q99 não está em eval/questions.jsonl");
   });
 
   it("does not reorder the list it received", () => {

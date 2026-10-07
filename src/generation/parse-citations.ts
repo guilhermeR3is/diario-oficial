@@ -1,6 +1,6 @@
 import { NOT_FOUND_ANSWER } from "./build-prompt";
 
-const CITATION = /\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]/g;
+export const CITATION = /\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]/g;
 
 const REFUSAL_START = NOT_FOUND_ANSWER.replace(/\.$/, "").toLowerCase();
 

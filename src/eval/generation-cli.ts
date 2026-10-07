@@ -46,7 +46,7 @@ async function evaluate(
     questions,
     await readResults(RESULTS_FILE),
     current,
-    args.limit,
+    { limit: args.limit, redo: args.redo },
   );
   if (pending.length === 0) {
     process.stdout.write("Nada pendente para este modelo e este prompt.\n");
