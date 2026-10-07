@@ -7,8 +7,8 @@ import type { EvalQuestion } from "./questions";
 export const DEFAULT_LIMIT = 20;
 export const DEFAULT_PAUSE_SECONDS = 60;
 
-// estimativa, não medida: ~4,5 mil tokens de entrada e até 1.024 de saída por pergunta
-export const TOKENS_PER_QUESTION = 5_000;
+// média medida em 5 chamadas reais (todas recusas, saída de ~35 tokens): 5,4 mil por pergunta; respostas com texto gastam um pouco mais
+export const TOKENS_PER_QUESTION = 5_700;
 
 // duas falhas seguidas indicam cota esgotada ou chave inválida; seguir só gastaria o que resta
 const MAX_CONSECUTIVE_FAILURES = 2;

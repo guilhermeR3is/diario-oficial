@@ -61,7 +61,7 @@ async function evaluate(
     [
       `Modelo: ${current.model} (plano gratuito da Groq: 200 mil tokens por dia e 8 mil por minuto)`,
       `Vou perguntar ${pending.length} de ${questions.length} perguntas, as sem resposta primeiro.`,
-      `Estimativa: ~${Math.round(tokens / 1000)} mil tokens (cerca de ${TOKENS_PER_QUESTION} por pergunta, não medido) e cerca de ${duration} por causa da pausa de ${args.pauseSeconds} s.`,
+      `Estimativa: ~${Math.round(tokens / 1000)} mil tokens (cerca de ${TOKENS_PER_QUESTION} por pergunta, média de chamadas reais) e cerca de ${duration} por causa da pausa de ${args.pauseSeconds} s.`,
       "Se você já rodou hoje, some o que gastou; a hora em que a cota diária zera não foi verificada.",
       "",
     ].join("\n"),
