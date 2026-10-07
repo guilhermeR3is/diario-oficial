@@ -111,6 +111,7 @@ describe("searchText", () => {
 
     expect(hit).toMatchObject({
       chunkId: id,
+      ordinal: 0,
       actType: "PORTARIA",
       secretariat: "SEMED",
       date: "2026-09-30",

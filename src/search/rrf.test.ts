@@ -8,6 +8,7 @@ const hit = (
   title = `ato ${chunkId}`,
 ): SearchHit => ({
   chunkId,
+  ordinal: chunkId + 100,
   score,
   actType: "PORTARIA",
   title,

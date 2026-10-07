@@ -1,5 +1,6 @@
 export type SearchHit = {
   chunkId: number;
+  ordinal: number;
   score: number;
   actType: string;
   title: string;
@@ -14,6 +15,7 @@ export type SearchHit = {
 export type HitRow = {
   score: number;
   chunk_id: number;
+  ordinal: number;
   act_type: string;
   title: string;
   secretariat: string | null;
@@ -29,6 +31,7 @@ export type HitRow = {
 export function toSearchHit(row: HitRow): SearchHit {
   return {
     chunkId: row.chunk_id,
+    ordinal: row.ordinal,
     score: row.score,
     actType: row.act_type,
     title: row.title,

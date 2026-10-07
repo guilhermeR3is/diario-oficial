@@ -17,7 +17,7 @@ export async function searchChunks(
       ORDER BY embedding <=> ${literal}::vector
       LIMIT ${limit}
     )
-    SELECT n.score, c.id AS chunk_id, c.act_type, c.title, c.secretariat, c.date,
+    SELECT n.score, c.id AS chunk_id, c.ordinal, c.act_type, c.title, c.secretariat, c.date,
            c.page, c.page_end, c.text,
            e.id AS edition_id, e.title AS edition_title, e.source_url
     FROM nearest n

@@ -19,6 +19,7 @@
     "chunk": "tsx src/chunking/cli.ts",
     "chunk:stats": "tsx src/chunking/stats-cli.ts",
     "eval:check": "tsx src/eval/check-cli.ts",
+    "eval:retrieval": "tsx src/eval/retrieval-cli.ts",
     "embed": "tsx src/embedding/cli.ts",
     "chunking:fixtures": "tsx src/chunking/save-fixtures.ts"
   },
