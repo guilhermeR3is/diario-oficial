@@ -7,7 +7,7 @@ import type { SearchHit } from "./search-hit";
 
 const RESULT_LIMIT = 10;
 
-const searchRequestSchema = z.object({
+export const searchRequestSchema = z.object({
   model: z.literal(EMBEDDING_MODEL),
   vector: z
     .array(z.number())
