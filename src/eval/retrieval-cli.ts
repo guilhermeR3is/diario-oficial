@@ -9,6 +9,7 @@ import { searchText } from "@/search/search-text";
 import { parseQuestions } from "./questions";
 import { formatReport } from "./report";
 import { SEARCH_LIMIT, runRetrieval } from "./run-retrieval";
+import { parseSubset, selectSubset } from "./subset";
 
 async function assertAllChunksHaveTheModelVector() {
   const [row] = await db.$queryRaw<{ missing: number }[]>`
@@ -22,8 +23,10 @@ async function assertAllChunksHaveTheModelVector() {
 }
 
 async function main() {
-  const questions = parseQuestions(
-    await readFile("eval/questions.jsonl", "utf8"),
+  const subset = parseSubset(process.argv.slice(2));
+  const questions = selectSubset(
+    parseQuestions(await readFile("eval/questions.jsonl", "utf8")),
+    subset,
   );
   await assertAllChunksHaveTheModelVector();
 
@@ -51,7 +54,7 @@ async function main() {
       ),
   });
 
-  process.stdout.write(formatReport(run));
+  process.stdout.write(`Subconjunto: ${subset}\n\n${formatReport(run)}`);
 }
 
 main()

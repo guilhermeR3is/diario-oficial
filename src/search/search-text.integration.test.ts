@@ -104,6 +104,26 @@ describe("searchText", () => {
     expect(await idsFor("merenda escolar", 1)).toEqual([close.id]);
   });
 
+  it("weighs a rare word above a common one, however often the common one repeats", async () => {
+    const spam = await createChunk("municipal ".repeat(20));
+    const rare = await createChunk("zeppelin");
+    for (let i = 0; i < 6; i++) await createChunk(`ato municipal número ${i}`);
+
+    const ids = await idsFor("municipal zeppelin");
+
+    expect(ids[0]).toBe(rare.id);
+    expect(ids).toContain(spam.id);
+    expect(await idsFor("municipal zeppelin", 1)).toEqual([rare.id]);
+  });
+
+  it("does not break on a word that carries an apostrophe, as a URL in the question does", async () => {
+    const target = await createChunk("licitação de merenda escolar");
+
+    expect(await idsFor("veja http://x.com/a'b?q=1 sobre merenda")).toEqual([
+      target.id,
+    ]);
+  });
+
   it("returns what is needed to cite the chunk", async () => {
     const { id } = await createChunk("Art. 1º Fica designada a servidora");
 
@@ -137,6 +157,24 @@ describe("searchText", () => {
     await createChunk("nomeação de professor");
 
     expect(await idsFor("ambulância")).toEqual([]);
+  });
+
+  it("cuts equally ranked chunks by id too, not by where the row happens to sit", async () => {
+    const created = [];
+    for (let i = 0; i < 12; i++) {
+      created.push(await createChunk("licitação de merenda"));
+    }
+    // regravar muda a posição física da linha, e é isso que o desempate precisa vencer
+    for (const chunk of created.slice(0, 3).reverse()) {
+      await db.chunk.update({
+        where: { id: chunk.id },
+        data: { text: "licitação de merenda" },
+      });
+    }
+
+    expect(await idsFor("licitação merenda", 3)).toEqual(
+      created.slice(0, 3).map((chunk) => chunk.id),
+    );
   });
 
   it("returns nothing, without an error, for a question made only of stop words", async () => {
