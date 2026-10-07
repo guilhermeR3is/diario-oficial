@@ -9,7 +9,7 @@ export const QUESTION_KINDS = [
 
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 
-const chunkKey = z.strictObject({
+export const chunkKey = z.strictObject({
   sourceUrl: z.url(),
   ordinal: z.number().int().min(0),
 });

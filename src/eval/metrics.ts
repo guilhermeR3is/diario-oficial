@@ -4,7 +4,8 @@ export const RECALL_AT = 5;
 
 type HitKey = { ordinal: number; edition: { sourceUrl: string } };
 
-const keyOf = ({ sourceUrl, ordinal }: ChunkKey) => `${sourceUrl}#${ordinal}`;
+export const keyOf = ({ sourceUrl, ordinal }: ChunkKey) =>
+  `${sourceUrl}#${ordinal}`;
 
 // posição (a partir de 1) do primeiro trecho relevante, ou null se nenhum aparece
 export function firstRelevantRank(

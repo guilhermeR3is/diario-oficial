@@ -1,26 +1,15 @@
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
-import { EMBEDDING_MODEL } from "@/embedding/model";
 import { loadEmbedder } from "@/embedding/gte-embedder";
 import { db } from "@/lib/db";
 import { searchChunks } from "@/search/search-chunks";
 import { searchHybrid } from "@/search/search-hybrid";
 import { searchText } from "@/search/search-text";
+import { assertAllChunksHaveTheModelVector } from "./assert-chunk-vectors";
 import { parseQuestions } from "./questions";
 import { formatReport } from "./report";
 import { SEARCH_LIMIT, runRetrieval } from "./run-retrieval";
 import { parseSubset, selectSubset } from "./subset";
-
-async function assertAllChunksHaveTheModelVector() {
-  const [row] = await db.$queryRaw<{ missing: number }[]>`
-    SELECT count(*)::int AS missing FROM chunk
-    WHERE embedding IS NULL OR embedding_model IS DISTINCT FROM ${EMBEDDING_MODEL}`;
-  if (row!.missing > 0) {
-    throw new Error(
-      `${row!.missing} trechos sem o vetor de ${EMBEDDING_MODEL}: rode pnpm embed antes`,
-    );
-  }
-}
 
 async function main() {
   const subset = parseSubset(process.argv.slice(2));
@@ -28,7 +17,7 @@ async function main() {
     parseQuestions(await readFile("eval/questions.jsonl", "utf8")),
     subset,
   );
-  await assertAllChunksHaveTheModelVector();
+  await assertAllChunksHaveTheModelVector(db);
 
   const embed = await loadEmbedder();
   const vectors = new Map<string, number[]>();
