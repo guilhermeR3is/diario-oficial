@@ -1,6 +1,5 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { z } from "zod";
+import { appendJsonl, parseJsonl, readJsonl } from "./jsonl-store";
 import { chunkKey } from "./questions";
 
 const generationResultSchema = z.strictObject({
@@ -17,53 +16,14 @@ const generationResultSchema = z.strictObject({
 
 export type GenerationResult = z.infer<typeof generationResultSchema>;
 
-export function parseResults(raw: string): GenerationResult[] {
-  const results: GenerationResult[] = [];
+export const parseResults = (raw: string) =>
+  parseJsonl(raw, generationResultSchema);
 
-  raw.split("\n").forEach((line, index) => {
-    if (line.trim() === "") return;
-    const lineNumber = index + 1;
+export const readResults = (path: string) =>
+  readJsonl(path, generationResultSchema);
 
-    let json: unknown;
-    try {
-      json = JSON.parse(line);
-    } catch {
-      throw new Error(`linha ${lineNumber}: JSON inválido`);
-    }
-
-    const parsed = generationResultSchema.safeParse(json);
-    if (!parsed.success) {
-      const issues = parsed.error.issues
-        .map(
-          (issue) => `${issue.path.join(".") || "(linha)"}: ${issue.message}`,
-        )
-        .join("; ");
-      throw new Error(`linha ${lineNumber}: ${issues}`);
-    }
-    results.push(parsed.data);
-  });
-
-  return results;
-}
-
-export async function readResults(path: string): Promise<GenerationResult[]> {
-  let raw: string;
-  try {
-    raw = await readFile(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-  return parseResults(raw);
-}
-
-export async function appendResult(
-  path: string,
-  result: GenerationResult,
-): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await appendFile(path, `${JSON.stringify(result)}\n`);
-}
+export const appendResult = (path: string, result: GenerationResult) =>
+  appendJsonl(path, result);
 
 // o arquivo só cresce: se uma pergunta aparece de novo para o mesmo modelo e prompt, vale a última
 export function latestResults(

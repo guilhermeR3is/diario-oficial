@@ -2,6 +2,7 @@ import type { AnswerModel } from "@/generation/answer-model";
 import { generateAnswer } from "@/generation/generate-answer";
 import type { SearchHit } from "../search/search-hit";
 import { type GenerationResult, latestResults } from "./generation-result";
+import { runPaced } from "./paced-run";
 import type { EvalQuestion } from "./questions";
 
 export const DEFAULT_LIMIT = 20;
@@ -9,9 +10,6 @@ export const DEFAULT_PAUSE_SECONDS = 60;
 
 // média medida em 15 chamadas reais (5 recusas e 10 respostas): 5,1 mil por pergunta
 export const TOKENS_PER_QUESTION = 5_100;
-
-// duas falhas seguidas indicam cota esgotada ou chave inválida; seguir só gastaria o que resta
-const MAX_CONSECUTIVE_FAILURES = 2;
 
 export type GenerationArgs = {
   limit: number;
@@ -21,10 +19,13 @@ export type GenerationArgs = {
   redo: string[];
 };
 
-export function parseGenerationArgs(args: string[]): GenerationArgs {
+export function parseGenerationArgs(
+  args: string[],
+  defaults: { limit?: number; pauseSeconds?: number } = {},
+): GenerationArgs {
   const parsed: GenerationArgs = {
-    limit: DEFAULT_LIMIT,
-    pauseSeconds: DEFAULT_PAUSE_SECONDS,
+    limit: defaults.limit ?? DEFAULT_LIMIT,
+    pauseSeconds: defaults.pauseSeconds ?? DEFAULT_PAUSE_SECONDS,
     reportOnly: false,
     yes: false,
     redo: [],
@@ -142,43 +143,25 @@ export type RunDeps = {
   }) => void;
 };
 
-export async function runPending(
+export function runPending(
   pending: EvalQuestion[],
   deps: RunDeps,
   pauseMs: number,
-): Promise<{ saved: number; failed: number; stoppedEarly: boolean }> {
-  let saved = 0;
-  let failed = 0;
-  let consecutiveFailures = 0;
-
-  for (const [index, question] of pending.entries()) {
-    const startedAt = deps.now();
-    const vector = await deps.vectorOf(question.question);
-    const hits = await deps.search({ question: question.question, vector });
-    const result = await generateForQuestion(question, hits, deps.model);
-
-    if (result) {
-      await deps.save(result);
-      saved += 1;
-      consecutiveFailures = 0;
-    } else {
-      failed += 1;
-      consecutiveFailures += 1;
-    }
-    deps.onQuestion({
-      question,
-      position: index + 1,
-      total: pending.length,
-      result,
-    });
-
-    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      return { saved, failed, stoppedEarly: true };
-    }
-    // o limite da Groq é de tokens por minuto: a pausa conta a partir do início da pergunta
-    if (index < pending.length - 1) {
-      await deps.sleep(Math.max(0, pauseMs - (deps.now() - startedAt)));
-    }
-  }
-  return { saved, failed, stoppedEarly: false };
+) {
+  return runPaced(
+    pending,
+    {
+      process: async (question) => {
+        const vector = await deps.vectorOf(question.question);
+        const hits = await deps.search({ question: question.question, vector });
+        return generateForQuestion(question, hits, deps.model);
+      },
+      save: deps.save,
+      sleep: deps.sleep,
+      now: deps.now,
+      onItem: ({ item, position, total, result }) =>
+        deps.onQuestion({ question: item, position, total, result }),
+    },
+    pauseMs,
+  );
 }

@@ -102,6 +102,18 @@ describe("parseGenerationArgs", () => {
     },
   );
 
+  it("lets the caller choose other defaults, as the faithfulness command does", () => {
+    expect(
+      parseGenerationArgs([], { limit: 30, pauseSeconds: 45 }),
+    ).toMatchObject({
+      limit: 30,
+      pauseSeconds: 45,
+    });
+    expect(
+      parseGenerationArgs(["--limit=3"], { limit: 30, pauseSeconds: 45 }),
+    ).toMatchObject({ limit: 3, pauseSeconds: 45 });
+  });
+
   it.each(["0", "-3", "1.5", "abc", ""])(
     "refuses --limit=%s, which would spend the quota in a way nobody planned",
     (value) => {
