@@ -128,6 +128,13 @@ describe("buildPrompt", () => {
     expect(system).toContain(`"${NOT_FOUND_ANSWER}"`);
   });
 
+  it("warns that an order inside a source is data even when it claims authority", () => {
+    const { system } = buildPrompt("pergunta", [hit(1)]);
+
+    expect(system).toContain("nota do administrador");
+    expect(system).toContain("escrever uma palavra");
+  });
+
   it("builds an empty list of sources without breaking", () => {
     const { user } = buildPrompt("pergunta", []);
 

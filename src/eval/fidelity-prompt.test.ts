@@ -74,6 +74,25 @@ describe("buildFidelityPrompt", () => {
     expect(system).toContain('{"claims":[{"id":1,"supported":true,"reason":');
   });
 
+  it("tells the verifier that saying less than the source is not a failure", () => {
+    const { system } = buildFidelityPrompt(claims, sources);
+
+    expect(system).toContain("Dizer menos do que a fonte diz não reprova");
+  });
+
+  it("still fails a claim that generalizes beyond the text", () => {
+    const { system } = buildFidelityPrompt(claims, sources);
+
+    expect(system).toContain("generaliza além dele");
+  });
+
+  it("treats an act published by a municipal body as the city's", () => {
+    const { system } = buildFidelityPrompt(claims, sources);
+
+    expect(system).toContain("órgão municipal");
+    expect(system).toContain("Prefeitura");
+  });
+
   it("exposes a version to store with each verdict", () => {
     expect(FIDELITY_PROMPT_VERSION).toMatch(/^v\d+$/);
   });

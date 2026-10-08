@@ -111,9 +111,14 @@ async function evaluate(
 async function main() {
   const args = parseGenerationArgs(process.argv.slice(2));
   const questions = parseQuestions(await readFile(QUESTIONS_FILE, "utf8"));
+  if (args.only.length > 0)
+    throw new Error("--only vale só no eval:fidelity --sample");
+  if (args.promptVersion && !args.reportOnly) {
+    throw new Error("--prompt-version vale só com --report");
+  }
   const current = {
     model: env.GENERATION_MODEL,
-    promptVersion: PROMPT_VERSION,
+    promptVersion: args.promptVersion ?? PROMPT_VERSION,
   };
 
   if (!args.reportOnly) await evaluate(questions, current, args);

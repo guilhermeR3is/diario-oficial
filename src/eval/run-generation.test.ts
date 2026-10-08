@@ -70,6 +70,8 @@ describe("parseGenerationArgs", () => {
       reportOnly: false,
       yes: false,
       redo: [],
+      promptVersion: null,
+      only: [],
     });
     expect(DEFAULT_LIMIT).toBe(20);
     expect(DEFAULT_PAUSE_SECONDS).toBe(60);
@@ -81,6 +83,8 @@ describe("parseGenerationArgs", () => {
         "--limit=5",
         "--pause-seconds=10",
         "--redo=q04, q05,q04",
+        "--only=q26,q27",
+        "--prompt-version=v1",
         "--report",
         "--yes",
       ]),
@@ -90,7 +94,24 @@ describe("parseGenerationArgs", () => {
       reportOnly: true,
       yes: true,
       redo: ["q04", "q05"],
+      promptVersion: "v1",
+      only: ["q26", "q27"],
     });
+  });
+
+  it.each(["", "1", "v", "v1.2", "versao1"])(
+    "refuses --prompt-version=%s",
+    (value) => {
+      expect(() => parseGenerationArgs([`--prompt-version=${value}`])).toThrow(
+        /--prompt-version deve ser como v1/,
+      );
+    },
+  );
+
+  it("names the right option when --only lists a bad id", () => {
+    expect(() => parseGenerationArgs(["--only=q4"])).toThrow(
+      /--only deve listar ids/,
+    );
   });
 
   it.each(["", "4", "q4", "q04,,q05", "q04;q05", "pergunta"])(

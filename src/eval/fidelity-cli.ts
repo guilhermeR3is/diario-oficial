@@ -37,8 +37,8 @@ const SAMPLE_FILE = "data/eval/fidelity-sample.md";
 // uma conferência é bem menor que uma geração: sem os 6 trechos, só os citados
 const DEFAULTS = { limit: 30, pauseSeconds: 30 };
 
-// o qwen recusa pedidos de saída acima de 1.000 por minuto (429 em 07/10/2026); o verificador usou no máximo 311
-const VERIFIER_MAX_OUTPUT_TOKENS = 800;
+// o qwen recusa pedidos de saída acima de 1.000 por minuto (429 em 07/10/2026); com o prompt v2 o raciocínio chegou a 800 e cortou a q11
+const VERIFIER_MAX_OUTPUT_TOKENS = 950;
 
 async function confirm(message: string): Promise<boolean> {
   const terminal = createInterface({
@@ -173,6 +173,12 @@ async function main() {
     rawArgs.filter((arg) => arg !== "--sample"),
     DEFAULTS,
   );
+  if (args.only.length > 0 && !sampleOnly) {
+    throw new Error("--only vale só com --sample");
+  }
+  if (args.promptVersion && !args.reportOnly && !sampleOnly) {
+    throw new Error("--prompt-version vale só com --report ou --sample");
+  }
   const questions = parseQuestions(await readFile(QUESTIONS_FILE, "utf8"));
   const current = {
     verifier: env.FIDELITY_MODEL,
@@ -181,7 +187,7 @@ async function main() {
   const generations = [
     ...latestResults(await readResults(GENERATION_FILE), {
       model: env.GENERATION_MODEL,
-      promptVersion: PROMPT_VERSION,
+      promptVersion: args.promptVersion ?? PROMPT_VERSION,
     }).values(),
   ];
 
@@ -197,7 +203,11 @@ async function main() {
   );
 
   if (sampleOnly) {
-    await writeSample(checks, generations, questions, current);
+    const scoped =
+      args.only.length > 0
+        ? checks.filter((check) => args.only.includes(check.id))
+        : checks;
+    await writeSample(scoped, generations, questions, current);
     return;
   }
   const checkedIds = new Set(checks.map((check) => check.id));

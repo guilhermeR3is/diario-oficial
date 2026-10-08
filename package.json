@@ -22,6 +22,8 @@
     "eval:retrieval": "tsx src/eval/retrieval-cli.ts",
     "eval:generation": "tsx src/eval/generation-cli.ts",
     "eval:fidelity": "tsx src/eval/fidelity-cli.ts",
+    "eval:injection": "tsx src/eval/injection-cli.ts",
+    "eval:ask": "tsx src/eval/ask-proof-cli.ts",
     "embed": "tsx src/embedding/cli.ts",
     "chunking:fixtures": "tsx src/chunking/save-fixtures.ts"
   },

@@ -17,6 +17,8 @@ export type GenerationArgs = {
   reportOnly: boolean;
   yes: boolean;
   redo: string[];
+  promptVersion: string | null;
+  only: string[];
 };
 
 export function parseGenerationArgs(
@@ -29,6 +31,8 @@ export function parseGenerationArgs(
     reportOnly: false,
     yes: false,
     redo: [],
+    promptVersion: null,
+    only: [],
   };
 
   for (const arg of args) {
@@ -38,6 +42,12 @@ export function parseGenerationArgs(
       parsed.limit = positiveInteger("--limit", arg.slice("--limit=".length));
     } else if (arg.startsWith("--redo=")) {
       parsed.redo = questionIds(arg.slice("--redo=".length));
+    } else if (arg.startsWith("--only=")) {
+      parsed.only = questionIds(arg.slice("--only=".length), "--only");
+    } else if (arg.startsWith("--prompt-version=")) {
+      parsed.promptVersion = promptVersion(
+        arg.slice("--prompt-version=".length),
+      );
     } else if (arg.startsWith("--pause-seconds=")) {
       parsed.pauseSeconds = positiveInteger(
         "--pause-seconds",
@@ -45,19 +55,26 @@ export function parseGenerationArgs(
       );
     } else {
       throw new Error(
-        `argumento desconhecido "${arg}" (use --limit=N, --pause-seconds=N, --redo=q04,q05, --report, --yes)`,
+        `argumento desconhecido "${arg}" (use --limit=N, --pause-seconds=N, --redo=q04,q05, --only=q26,q27, --prompt-version=v1, --report, --yes)`,
       );
     }
   }
   return parsed;
 }
 
-function questionIds(text: string): string[] {
+function questionIds(text: string, name = "--redo"): string[] {
   const ids = text.split(",").map((id) => id.trim());
   if (ids.some((id) => !/^q\d{2}$/.test(id))) {
-    throw new Error(`--redo deve listar ids como q04,q05 (recebi "${text}")`);
+    throw new Error(`${name} deve listar ids como q04,q05 (recebi "${text}")`);
   }
   return [...new Set(ids)];
+}
+
+function promptVersion(text: string): string {
+  if (!/^v\d+$/.test(text)) {
+    throw new Error(`--prompt-version deve ser como v1 (recebi "${text}")`);
+  }
+  return text;
 }
 
 function positiveInteger(name: string, text: string): number {
