@@ -21,11 +21,13 @@ const toPlainTypography = (text: string) =>
   ).join("");
 
 // o raciocínio talvez conte neste teto (a documentação não diz); 1024 deixa folga para ~350 tokens de resposta
-const MAX_COMPLETION_TOKENS = 1024;
+const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
 
 export function createGroqAnswerModel(options: {
   apiKey: string;
   model: string;
+  // cada modelo tem o seu limite de saída por minuto na Groq; o do qwen é 1.000
+  maxCompletionTokens?: number;
 }): AnswerModel {
   const client = new Groq({ apiKey: options.apiKey });
 
@@ -39,7 +41,8 @@ export function createGroqAnswerModel(options: {
           { role: "user", content: prompt.user },
         ],
         stream: true,
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        max_completion_tokens:
+          options.maxCompletionTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
         // só vale para modelos de raciocínio (gpt-oss); outro modelo pode recusar estes dois parâmetros
         reasoning_effort: "low",
         include_reasoning: false,

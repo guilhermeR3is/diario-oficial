@@ -37,6 +37,9 @@ const SAMPLE_FILE = "data/eval/fidelity-sample.md";
 // uma conferência é bem menor que uma geração: sem os 6 trechos, só os citados
 const DEFAULTS = { limit: 30, pauseSeconds: 30 };
 
+// o qwen recusa pedidos de saída acima de 1.000 por minuto (429 em 07/10/2026); o verificador usou no máximo 311
+const VERIFIER_MAX_OUTPUT_TOKENS = 800;
+
 async function confirm(message: string): Promise<boolean> {
   const terminal = createInterface({
     input: process.stdin,
@@ -94,6 +97,7 @@ async function evaluate(
   const verifier = createGroqAnswerModel({
     apiKey: env.GROQ_API_KEY,
     model: current.verifier,
+    maxCompletionTokens: VERIFIER_MAX_OUTPUT_TOKENS,
   });
   const outcome = await runPaced(
     pending,

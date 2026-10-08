@@ -98,6 +98,22 @@ describe("createGroqAnswerModel", () => {
     });
   });
 
+  it("asks for the output cap it was given, which some models need to be lower", async () => {
+    create.mockResolvedValue(chunks(chunk("ok", "stop")));
+
+    await collect(
+      createGroqAnswerModel({
+        apiKey: "chave-de-teste",
+        model: "openai/teste",
+        maxCompletionTokens: 800,
+      }).stream(prompt),
+    );
+
+    expect(create.mock.calls[0][0]).toMatchObject({
+      max_completion_tokens: 800,
+    });
+  });
+
   it("caps the answer and keeps the model's reasoning short and out of the answer", async () => {
     create.mockResolvedValue(chunks(chunk("ok", "stop")));
 
