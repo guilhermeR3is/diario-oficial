@@ -2,8 +2,10 @@ import { env } from "@/env";
 import { toEventStream } from "@/generation/event-stream";
 import { createGroqAnswerModel } from "@/generation/groq-answer-model";
 import { SOURCE_COUNT, handleAskRequest } from "@/generation/handle-ask";
+import { recordQuery } from "@/generation/query-log";
 import { db } from "@/lib/db";
 import { searchHybrid } from "@/search/search-hybrid";
+import { searchText } from "@/search/search-text";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,13 @@ export async function POST(request: Request) {
   }
 
   const outcome = await handleAskRequest(
-    { model, search: (query) => searchHybrid(db, query, SOURCE_COUNT) },
+    {
+      model,
+      searchHybrid: (query) => searchHybrid(db, query, SOURCE_COUNT),
+      searchText: (question) => searchText(db, question, SOURCE_COUNT),
+      recordQuery: (record) => recordQuery(db, record),
+      now: () => performance.now(),
+    },
     payload,
   );
   if (outcome.status !== 200) {

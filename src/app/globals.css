@@ -1,26 +1,126 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* curva de saída mais firme que a padrão do Tailwind: responde logo ao toque */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-band: var(--band);
+  --color-band-foreground: var(--band-foreground);
+  --color-band-ink-soft: var(--band-ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-rule: var(--rule);
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 3px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+  --radius-4xl: 4px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  color-scheme: light;
+  --paper: #fafaf7;
+  --ink: #161412;
+  --ink-soft: #57524c;
+  --rule: #d9d6cf;
+  --band: #f2c12e;
+  --band-foreground: #161412;
+  --band-ink-soft: #3d3934;
+  --ink-faint: #5f5a53;
+  --shadow-ink: 22 20 18;
+
+  /* capas de cordel: uma por fonte, sempre com o número junto; o anil leva texto branco */
+  --cover-1: #f2c12e;
+  --cover-1-ink: #161412;
+  --cover-2: #e95f8b;
+  --cover-2-ink: #161412;
+  --cover-3: #2e9e63;
+  --cover-3-ink: #161412;
+  --cover-4: #3557b7;
+  --cover-4-ink: #ffffff;
+  --cover-5: #f07c2b;
+  --cover-5-ink: #161412;
+  --cover-6: #1fa2a6;
+  --cover-6-ink: #161412;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: #efede7;
+  --secondary-foreground: var(--ink);
+  --muted: #efede7;
+  --muted-foreground: var(--ink-soft);
+  --accent: #efede7;
+  --accent-foreground: var(--ink);
+  --destructive: #b42318;
+  --border: var(--rule);
+  --input: #8f8a82;
+  --ring: #3557b7;
+  --radius: 2px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: var(--band);
+    color: var(--ink);
+  }
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+  textarea {
+    caret-color: var(--ring);
+  }
+  * {
+    scrollbar-color: var(--ink-faint) transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* fora de @layer de propósito: dentro da camada base, o outline-none dos componentes do shadcn apagava o foco (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

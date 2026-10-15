@@ -70,3 +70,35 @@ model Chunk {
   @@index([tsv], type: Gin)
   @@map("chunk")
 }
+
+// respostas das perguntas de exemplo, geradas uma vez e servidas sem chamar o modelo
+model CachedAnswer {
+  id            Int      @id @default(autoincrement())
+  questionSlug  String   @unique @map("question_slug")
+  question      String
+  answer        String
+  // lista ordenada de { sourceUrl, ordinal }: o [n] da resposta aponta para o item n; o id do trecho muda se o banco for recriado
+  citations     Json
+  model         String
+  promptVersion String   @map("prompt_version")
+  position      Int      @unique
+  generatedAt   DateTime @map("generated_at")
+
+  @@map("cached_answer")
+}
+
+// uma linha por pergunta livre respondida; o id é aleatório para que ninguém dê feedback na resposta dos outros adivinhando números
+model QueryLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  question          String
+  searchMode        String   @map("search_mode")
+  retrievedChunkIds Int[]    @map("retrieved_chunk_ids")
+  answer            String
+  model             String
+  promptVersion     String   @map("prompt_version")
+  latencyMs         Int      @map("latency_ms")
+  feedback          String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("query_log")
+}
