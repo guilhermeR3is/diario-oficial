@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { recordFeedback, recordQuery } from "@/generation/query-log";
 import { startTestDatabase } from "@/test/database";
 import { listExamples, loadExample } from "./cached-answers";
+import { type GeneratedExample, saveExamples } from "./generate-examples";
 
 describe("cached answers and the query log", () => {
   let testDb: Awaited<ReturnType<typeof startTestDatabase>>;
@@ -141,6 +142,8 @@ describe("cached answers and the query log", () => {
       model: "fake",
       promptVersion: "v2",
       latencyMs: 812,
+      totalTokens: 5_120,
+      visitorHash: "a".repeat(64),
     });
 
     expect(await recordFeedback(db, queryId, false)).toBe(true);
@@ -151,8 +154,64 @@ describe("cached answers and the query log", () => {
       searchMode: "text",
       retrievedChunkIds: [1, 2],
       latencyMs: 812,
+      totalTokens: 5_120,
+      visitorHash: "a".repeat(64),
       feedback: "useful",
     });
+  });
+
+  it("replaces every saved example at once with the newly generated ones", async () => {
+    await cachedAnswer("provisoria", 1, []);
+    await cachedAnswer("outra-provisoria", 2, []);
+    const url = "https://exemplo.test/190.pdf";
+    const generated = (slug: string, position: number): GeneratedExample => ({
+      questionSlug: slug,
+      question: `pergunta ${slug}?`,
+      answer: "Saiu a portaria [2].",
+      citations: [
+        { sourceUrl: url, ordinal: 4 },
+        { sourceUrl: url, ordinal: 9 },
+      ],
+      model: "openai/gpt-oss-120b",
+      promptVersion: "v2",
+      position,
+      generatedAt: new Date("2026-10-16T12:00:00Z"),
+    });
+
+    await saveExamples(db, [
+      generated("nova", 1),
+      generated("segunda-nova", 2),
+    ]);
+
+    expect(await listExamples(db)).toEqual([
+      { slug: "nova", question: "pergunta nova?" },
+      { slug: "segunda-nova", question: "pergunta segunda-nova?" },
+    ]);
+    expect((await loadExample(db, "nova"))?.sources[1].title).toBe(
+      "PORTARIA N.º 9/2026",
+    );
+  });
+
+  it("keeps the old examples when saving the new ones fails halfway", async () => {
+    await cachedAnswer("provisoria", 1, []);
+    const repeated: GeneratedExample = {
+      questionSlug: "nova",
+      question: "pergunta nova?",
+      answer: "Saiu [1].",
+      citations: [],
+      model: "openai/gpt-oss-120b",
+      promptVersion: "v2",
+      position: 1,
+      generatedAt: new Date("2026-10-16T12:00:00Z"),
+    };
+
+    // duas na mesma posição: o índice único recusa a segunda
+    await expect(
+      saveExamples(db, [repeated, { ...repeated, questionSlug: "outra" }]),
+    ).rejects.toThrow();
+    expect(await listExamples(db)).toEqual([
+      { slug: "provisoria", question: "pergunta provisoria?" },
+    ]);
   });
 
   it("reports an unknown query id instead of creating feedback out of nowhere", async () => {

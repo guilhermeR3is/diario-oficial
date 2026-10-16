@@ -7,10 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 const MAX_LENGTH = 500;
 
 export function QuestionForm({
+  dailyLimit,
   onAsk,
   emptyError,
   onEmptyError,
 }: {
+  dailyLimit: number;
   onAsk: (question: string) => void;
   // o erro mora em quem chama, para sumir quando a resposta vem de um exemplo
   emptyError: boolean;
@@ -72,9 +74,15 @@ export function QuestionForm({
           ) : question.length > 400 ? (
             `${question.length} de ${MAX_LENGTH} caracteres`
           ) : (
-            <span className="hidden sm:inline">
-              Enter envia; Shift+Enter quebra a linha.
-            </span>
+            <>
+              <span className="block">
+                Até {dailyLimit} perguntas livres por dia; os exemplos não
+                contam.
+              </span>
+              <span className="hidden sm:block">
+                Enter envia; Shift+Enter quebra a linha.
+              </span>
+            </>
           )}
         </p>
         <Button

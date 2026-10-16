@@ -95,7 +95,7 @@ describe("readSse", () => {
   it("reads back what the server encodes", async () => {
     const events: AnswerEvent[] = [
       { type: "delta", text: "O valor é R$ 1.000,00. [1]" },
-      { type: "error", message: "generation failed" },
+      { type: "error", message: "generation failed", reason: "failed" },
     ];
     async function* source() {
       yield* events;

@@ -97,8 +97,22 @@ model QueryLog {
   model             String
   promptVersion     String   @map("prompt_version")
   latencyMs         Int      @map("latency_ms")
+  // null nas linhas de antes da Fase 8 e quando o provedor não informa o consumo
+  totalTokens       Int?     @map("total_tokens")
+  // hash do IP com a data e um segredo: o IP nunca é gravado e o mesmo visitante não se liga de um dia para o outro
+  visitorHash       String?  @map("visitor_hash")
   feedback          String?
   createdAt         DateTime @default(now()) @map("created_at")
 
   @@map("query_log")
+}
+
+// uma linha por dia e chave ("site" ou o hash de um visitante); somar e conferir o limite é uma instrução só, então pedidos simultâneos não passam do limite
+model LiveUsage {
+  day   DateTime @db.Date
+  key   String
+  count Int
+
+  @@id([day, key])
+  @@map("live_usage")
 }

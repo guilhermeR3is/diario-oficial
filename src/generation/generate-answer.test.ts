@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SearchHit } from "@/search/search-hit";
-import type { AnswerModel } from "./answer-model";
+import { type AnswerModel, ModelRateLimitError } from "./answer-model";
 import { NOT_FOUND_ANSWER, PROMPT_VERSION, buildPrompt } from "./build-prompt";
 import { createFakeAnswerModel } from "./fake-answer-model";
 import { type AnswerEvent, generateAnswer } from "./generate-answer";
@@ -188,7 +188,11 @@ describe("generateAnswer", () => {
     const events = await collect(generateAnswer(model, "pergunta", hits));
 
     const error = events.find((event) => event.type === "error");
-    expect(error).toEqual({ type: "error", message: "generation failed" });
+    expect(error).toEqual({
+      type: "error",
+      message: "generation failed",
+      reason: "failed",
+    });
     expect(JSON.stringify(events)).not.toContain("internal detail");
   });
 
@@ -203,7 +207,54 @@ describe("generateAnswer", () => {
       expect(events.at(-1)).toEqual({
         type: "error",
         message: "generation failed",
+        reason: "failed",
       });
+    },
+  );
+
+  it("reports the tokens the model says it spent, or null when it does not say", async () => {
+    const counted = createFakeAnswerModel("Saiu [1].", 7, 4_812);
+    const silent = createFakeAnswerModel("Saiu [1].");
+
+    expect(
+      doneOf(await collect(generateAnswer(counted, "pergunta", hits)))
+        .totalTokens,
+    ).toBe(4_812);
+    expect(
+      doneOf(await collect(generateAnswer(silent, "pergunta", hits)))
+        .totalTokens,
+    ).toBeNull();
+  });
+
+  it("spends zero tokens when there are no sources to send", async () => {
+    const model = createFakeAnswerModel("não usado", 7, 999);
+
+    const events = await collect(generateAnswer(model, "pergunta", []));
+
+    expect(doneOf(events).totalTokens).toBe(0);
+  });
+
+  it.each([
+    ["minute", "busy"],
+    ["day", "quota"],
+  ] as const)(
+    "tells a %s rate limit apart from other failures (%s)",
+    async (window, reason) => {
+      const model = failingModel(
+        [],
+        new ModelRateLimitError(window, {
+          cause: new Error("org_secret detail"),
+        }),
+      );
+
+      const events = await collect(generateAnswer(model, "pergunta", hits));
+
+      expect(events.at(-1)).toEqual({
+        type: "error",
+        message: "model rate limit reached",
+        reason,
+      });
+      expect(JSON.stringify(events)).not.toContain("org_secret");
     },
   );
 
@@ -221,6 +272,7 @@ describe("generateAnswer", () => {
         } finally {
           stopped = true;
         }
+        return undefined;
       },
     };
 

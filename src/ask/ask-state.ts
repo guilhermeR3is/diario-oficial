@@ -1,10 +1,24 @@
 import type { ExampleAnswer } from "@/examples/cached-answers";
+import type { GenerationFailure } from "@/generation/generate-answer";
 import type { AskEvent, SearchMode } from "@/generation/handle-ask";
 import type { SearchHit } from "@/search/search-hit";
 
 export type FailureReason =
-  // modelo desligado ou cota do dia esgotada
-  "unavailable" | "limit" | "network" | "generation" | "example";
+  // modelo desligado, limite do site ou cota do dia do modelo esgotada
+  | "unavailable"
+  // o visitante já usou as perguntas livres dele hoje
+  | "limit"
+  // limite por minuto do modelo: passa em instantes
+  | "busy"
+  | "network"
+  | "generation"
+  | "example";
+
+const FAILURE_FOR_GENERATION: Record<GenerationFailure, FailureReason> = {
+  busy: "busy",
+  quota: "unavailable",
+  failed: "generation",
+};
 
 export type AnswerOrigin =
   | { kind: "example"; generatedAt: string }
@@ -180,7 +194,7 @@ function applyEvent(state: AskState, event: AskEvent, at: number): AskState {
         },
       };
     case "error":
-      return failed(state, "generation");
+      return failed(state, FAILURE_FOR_GENERATION[event.reason]);
     default:
       return state;
   }

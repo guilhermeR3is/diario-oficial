@@ -345,6 +345,7 @@ describe("runPending", () => {
         clock.time += secondsPerQuestion * 1000;
         if (outcome === "fail") throw new Error("429");
         yield "Resposta [1].";
+        return undefined;
       },
     };
     const deps: RunDeps = {

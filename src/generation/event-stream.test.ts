@@ -36,8 +36,9 @@ describe("encodeSseEvent", () => {
         invalidCitations: [],
         model: "fake",
         promptVersion: "v1",
+        totalTokens: 5_120,
       },
-      { type: "error", message: "generation failed" },
+      { type: "error", message: "generation failed", reason: "failed" },
     ];
 
     for (const event of events) {
@@ -53,7 +54,7 @@ describe("toEventStream", () => {
       eventsOf(
         { type: "delta", text: "a" },
         { type: "delta", text: "b" },
-        { type: "error", message: "generation failed" },
+        { type: "error", message: "generation failed", reason: "failed" },
       ),
     );
 
@@ -63,7 +64,11 @@ describe("toEventStream", () => {
       [
         encodeSseEvent({ type: "delta", text: "a" }),
         encodeSseEvent({ type: "delta", text: "b" }),
-        encodeSseEvent({ type: "error", message: "generation failed" }),
+        encodeSseEvent({
+          type: "error",
+          message: "generation failed",
+          reason: "failed",
+        }),
       ].join(""),
     );
   });

@@ -9,6 +9,8 @@ export type QueryRecord = {
   model: string;
   promptVersion: string;
   latencyMs: number;
+  totalTokens: number | null;
+  visitorHash: string | null;
 };
 
 export async function recordQuery(

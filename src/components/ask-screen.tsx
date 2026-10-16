@@ -21,7 +21,11 @@ const SEARCH_LABEL = {
   text: "Busca só por palavras (sem o modelo de sentido)",
 } as const;
 
-export function AskScreen() {
+export function AskScreen({
+  visitorDailyLimit,
+}: {
+  visitorDailyLimit: number;
+}) {
   const { state, askExample, askLive, answerWithoutModel, reset } = useAsk();
   const [examples, setExamples] = useState<ExamplesState>({
     status: "loading",
@@ -119,6 +123,7 @@ export function AskScreen() {
     <main className="mx-auto grid w-full max-w-[1440px] gap-8 px-4 py-8 sm:px-8 lg:grid-cols-12 lg:gap-12 lg:py-12">
       <div className="flex min-w-0 flex-col gap-8 lg:col-span-7">
         <QuestionForm
+          dailyLimit={visitorDailyLimit}
           onAsk={ask}
           emptyError={emptyError}
           onEmptyError={setEmptyError}

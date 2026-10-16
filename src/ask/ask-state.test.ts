@@ -53,6 +53,7 @@ const done = (requestId = 1): AskAction => ({
     invalidCitations: [],
     model: "fake",
     promptVersion: "v2",
+    totalTokens: 5_120,
     queryId: "id-do-registro",
   },
 });
@@ -160,7 +161,11 @@ describe("askReducer", () => {
         type: "event",
         requestId: 1,
         at: 2_100,
-        event: { type: "error", message: "generation failed" },
+        event: {
+          type: "error",
+          message: "generation failed",
+          reason: "failed",
+        },
       },
     ]);
 
@@ -173,6 +178,28 @@ describe("askReducer", () => {
       partial: "Fula",
     });
   });
+
+  it.each([
+    ["busy", "busy"],
+    ["quota", "unavailable"],
+    ["failed", "generation"],
+  ] as const)(
+    "tells the visitor why the answer stopped when the server says %s",
+    (reason, failure) => {
+      const state = run([
+        ...live(),
+        sourcesEvent(),
+        {
+          type: "event",
+          requestId: 1,
+          at: 2_100,
+          event: { type: "error", message: "model rate limit reached", reason },
+        },
+      ]);
+
+      expect(state).toMatchObject({ phase: "failed", reason: failure });
+    },
+  );
 
   it("fails without sources when the request never got an answer", () => {
     expect(

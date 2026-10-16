@@ -7,7 +7,8 @@ const FAILURE_TEXT = {
   unavailable:
     "O modelo que escreve as respostas está indisponível hoje. Volte amanhã ou veja as perguntas de exemplo, que funcionam sempre.",
   limit:
-    "O limite de perguntas livres de hoje acabou. Volte amanhã ou veja as perguntas de exemplo, que funcionam sempre.",
+    "Você já fez as suas perguntas livres de hoje. Volte amanhã ou veja as perguntas de exemplo, que funcionam sempre.",
+  busy: "Muita gente perguntou ao mesmo tempo e o modelo pediu uma pausa. Tente de novo daqui a um minuto; esta tentativa contou como uma das suas perguntas de hoje.",
   network:
     "Não consegui falar com o servidor. Confira a conexão e tente de novo.",
   generation: "O modelo parou no meio da resposta. Tente de novo em instantes.",

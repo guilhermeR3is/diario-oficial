@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SlotOutcome } from "@/limits/live-limits";
 import { logger } from "@/lib/logger";
 import { searchRequestSchema } from "@/search/handle-search";
 import type { SearchHit } from "@/search/search-hit";
@@ -36,6 +37,9 @@ export type AskEvent =
   // queryId null: a resposta saiu, mas o registro falhou e não há onde gravar o feedback
   | (DoneEvent & { queryId: string | null });
 
+// o hash do visitante é acrescentado por quem conhece o pedido HTTP (a rota)
+export type AskRecord = Omit<QueryRecord, "visitorHash">;
+
 export type AskDependencies = {
   // sem modelo (LIVE_MODE=off) não há resposta ao vivo
   model: AnswerModel | null;
@@ -45,16 +49,28 @@ export type AskDependencies = {
   }) => Promise<SearchHit[]>;
   // reserva para quando o navegador do visitante não conseguiu calcular o vetor
   searchText: (question: string) => Promise<SearchHit[]>;
-  recordQuery: (record: QueryRecord) => Promise<string>;
+  // conta a pergunta para o visitante e para o site antes de qualquer gasto; a vaga não volta se algo falhar depois
+  reserveSlot: () => Promise<SlotOutcome>;
+  // a cota diária do modelo acabou: os próximos visitantes já recebem 503, sem gastar uma pergunta
+  closeDay: () => Promise<void>;
+  recordQuery: (record: AskRecord) => Promise<string>;
   now: () => number;
 };
 
 export type AskOutcome =
   | { status: 200; events: AsyncGenerator<AskEvent> }
-  | { status: 400 | 500 | 503; body: { error: string } };
+  | { status: 400 | 429 | 500 | 503; body: { error: string } };
 
 export async function handleAskRequest(
-  { model, searchHybrid, searchText, recordQuery, now }: AskDependencies,
+  {
+    model,
+    searchHybrid,
+    searchText,
+    reserveSlot,
+    closeDay,
+    recordQuery,
+    now,
+  }: AskDependencies,
   payload: unknown,
 ): Promise<AskOutcome> {
   const startedAt = now();
@@ -65,6 +81,20 @@ export async function handleAskRequest(
   const request = askRequestSchema.safeParse(payload);
   if (!request.success) {
     return { status: 400, body: { error: z.prettifyError(request.error) } };
+  }
+
+  let slot: SlotOutcome;
+  try {
+    slot = await reserveSlot();
+  } catch (error) {
+    logger.error({ err: error }, "live slot reservation failed");
+    return { status: 500, body: { error: "could not check the daily limit" } };
+  }
+  if (slot === "visitor-limit") {
+    return { status: 429, body: { error: "visitor daily limit reached" } };
+  }
+  if (slot === "site-limit") {
+    return { status: 503, body: { error: "site daily limit reached" } };
   }
 
   const { question, vector } = request.data;
@@ -86,6 +116,7 @@ export async function handleAskRequest(
       searchMode,
       hits,
       recordQuery,
+      closeDay,
       latencyMs: () => Math.round(now() - startedAt),
     }),
   };
@@ -98,6 +129,7 @@ async function* finishAsk(
     searchMode: SearchMode;
     hits: SearchHit[];
     recordQuery: AskDependencies["recordQuery"];
+    closeDay: AskDependencies["closeDay"];
     latencyMs: () => number;
   },
 ): AsyncGenerator<AskEvent> {
@@ -106,6 +138,9 @@ async function* finishAsk(
       yield { ...event, searchMode: context.searchMode };
     } else if (event.type === "done") {
       yield { ...event, queryId: await record(event, context) };
+    } else if (event.type === "error" && event.reason === "quota") {
+      await closeDayLogged(context.closeDay);
+      yield event;
     } else {
       yield event;
     }
@@ -125,10 +160,20 @@ async function record(
       model: done.model,
       promptVersion: done.promptVersion,
       latencyMs: context.latencyMs(),
+      totalTokens: done.totalTokens,
     });
   } catch (error) {
     // o visitante já tem a resposta; perder o registro só desliga o feedback dela
     logger.error({ err: error }, "query log failed");
     return null;
+  }
+}
+
+async function closeDayLogged(closeDay: AskDependencies["closeDay"]) {
+  try {
+    await closeDay();
+  } catch (error) {
+    // sem o dia fechado, o próximo visitante gasta uma pergunta para receber o mesmo 429
+    logger.error({ err: error }, "closing the live day failed");
   }
 }

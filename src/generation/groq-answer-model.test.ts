@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prompt } from "./build-prompt";
-import { createGroqAnswerModel } from "./groq-answer-model";
+import { ModelRateLimitError } from "./answer-model";
+import { createGroqAnswerModel, rateLimitWindow } from "./groq-answer-model";
 import { parseCitations } from "./parse-citations";
 
-const { create, clientCreated, logInfo } = vi.hoisted(() => ({
+const { create, clientCreated, logInfo, RateLimitError } = vi.hoisted(() => ({
   create: vi.fn(),
   clientCreated: vi.fn(),
   logInfo: vi.fn(),
+  // o SDK real devolve os cabeçalhos da resposta 429 no erro
+  RateLimitError: class extends Error {
+    constructor(readonly headers: Headers) {
+      super("429 Rate limit reached");
+    }
+  },
 }));
 
 vi.mock("groq-sdk", () => ({
+  RateLimitError,
   default: class {
     chat = { completions: { create } };
     constructor(options: unknown) {
@@ -158,6 +166,72 @@ describe("createGroqAnswerModel", () => {
     );
   });
 
+  it("returns the total tokens the provider reported, for the query log", async () => {
+    const usage = {
+      prompt_tokens: 4500,
+      completion_tokens: 300,
+      total_tokens: 4800,
+    };
+    create.mockResolvedValue(chunks(chunk("ok"), chunk(null, "stop", usage)));
+
+    const pieces = model().stream(prompt);
+    let next = await pieces.next();
+    while (!next.done) next = await pieces.next();
+
+    expect(next.value).toBe(4800);
+  });
+
+  it("returns no total when the provider reports no usage", async () => {
+    create.mockResolvedValue(chunks(chunk("ok", "stop")));
+
+    const pieces = model().stream(prompt);
+    let next = await pieces.next();
+    while (!next.done) next = await pieces.next();
+
+    expect(next.value).toBeUndefined();
+  });
+
+  it("passes the retry count to the client, so the site can turn retries off", () => {
+    createGroqAnswerModel({
+      apiKey: "chave-de-teste",
+      model: "openai/teste",
+      maxRetries: 0,
+    });
+
+    expect(clientCreated).toHaveBeenCalledWith({
+      apiKey: "chave-de-teste",
+      maxRetries: 0,
+    });
+  });
+
+  it.each([
+    ["7", "minute"],
+    ["60", "minute"],
+    ["61", "day"],
+    ["3600", "day"],
+  ] as const)(
+    "turns a 429 asking to wait %s s into a %s rate limit",
+    async (retryAfter, window) => {
+      create.mockRejectedValue(
+        new RateLimitError(new Headers({ "retry-after": retryAfter })),
+      );
+
+      const reading = collect(model().stream(prompt));
+
+      await expect(reading).rejects.toBeInstanceOf(ModelRateLimitError);
+      await expect(reading).rejects.toMatchObject({ window });
+    },
+  );
+
+  it("keeps the provider's 429 as the cause, for the server log", async () => {
+    const original = new RateLimitError(new Headers({ "retry-after": "3" }));
+    create.mockRejectedValue(original);
+
+    await expect(collect(model().stream(prompt))).rejects.toMatchObject({
+      cause: original,
+    });
+  });
+
   it("lets the provider's error reach the caller instead of hiding it", async () => {
     create.mockRejectedValue(new Error("429 rate limit"));
 
@@ -242,5 +316,18 @@ describe("createGroqAnswerModel", () => {
 
       expect(parseCitations(pieces.join(""), 6).cited).toEqual([1]);
     });
+  });
+});
+
+describe("rateLimitWindow", () => {
+  it.each([null, "", "  ", "amanhã", "-5"])(
+    "assumes the daily limit when the wait is missing or unreadable (%j)",
+    (retryAfter) => {
+      expect(rateLimitWindow(retryAfter)).toBe("day");
+    },
+  );
+
+  it("reads a wait of zero seconds as the minute limit", () => {
+    expect(rateLimitWindow("0")).toBe("minute");
   });
 });

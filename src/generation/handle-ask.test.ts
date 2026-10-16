@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "@/embedding/model";
+import type { SlotOutcome } from "@/limits/live-limits";
 import type { SearchHit } from "@/search/search-hit";
+import { type AnswerModel, ModelRateLimitError } from "./answer-model";
 import { NOT_FOUND_ANSWER, PROMPT_VERSION } from "./build-prompt";
 import { createFakeAnswerModel } from "./fake-answer-model";
 import {
   type AskDependencies,
+  type AskRecord,
   type AskEvent,
   type AskOutcome,
   SOURCE_COUNT,
   handleAskRequest,
 } from "./handle-ask";
-import type { QueryRecord } from "./query-log";
 
 const QUERY_ID = "0b6f3a52-6a51-4c43-9d1e-5f4f0c3b7a10";
 
@@ -57,7 +59,9 @@ function deps(overrides: Partial<AskDependencies> = {}) {
     model: createFakeAnswerModel("O decreto saiu [1]."),
     searchHybrid: searchReturning([hit(1)]),
     searchText: unusedSearch(),
-    recordQuery: vi.fn<(record: QueryRecord) => Promise<string>>(
+    reserveSlot: vi.fn(async (): Promise<SlotOutcome> => "granted"),
+    closeDay: vi.fn(async () => {}),
+    recordQuery: vi.fn<(record: AskRecord) => Promise<string>>(
       async () => QUERY_ID,
     ),
     // cada leitura do relógio avança 250 ms, para a latência ser conhecida
@@ -65,6 +69,13 @@ function deps(overrides: Partial<AskDependencies> = {}) {
     ...overrides,
   };
 }
+
+const rateLimited = (window: "minute" | "day"): AnswerModel => ({
+  name: "limitado",
+  async *stream() {
+    throw new ModelRateLimitError(window);
+  },
+});
 
 async function eventsOf(outcome: AskOutcome) {
   if (outcome.status !== 200) throw new Error(`status ${outcome.status}`);
@@ -88,7 +99,112 @@ describe("handleAskRequest", () => {
       body: { error: "live answers are turned off" },
     });
     expect(off.searchHybrid).not.toHaveBeenCalled();
+    expect(off.reserveSlot).not.toHaveBeenCalled();
     expect(off.recordQuery).not.toHaveBeenCalled();
+  });
+
+  it("spends one of the visitor's questions before searching", async () => {
+    const order: string[] = [];
+    const tracked = deps({
+      reserveSlot: vi.fn(async (): Promise<SlotOutcome> => {
+        order.push("reserve");
+        return "granted";
+      }),
+      searchHybrid: vi.fn(async () => {
+        order.push("search");
+        return [hit(1)];
+      }),
+    });
+
+    await eventsOf(await handleAskRequest(tracked, validPayload()));
+
+    expect(order).toEqual(["reserve", "search"]);
+    expect(tracked.reserveSlot).toHaveBeenCalledOnce();
+  });
+
+  it("answers 429 without searching or calling the model when the visitor used up the day", async () => {
+    const model = createFakeAnswerModel("não deveria falar [1]");
+    const limited = deps({
+      model,
+      reserveSlot: vi.fn(async (): Promise<SlotOutcome> => "visitor-limit"),
+    });
+
+    const outcome = await handleAskRequest(limited, validPayload());
+
+    expect(outcome).toEqual({
+      status: 429,
+      body: { error: "visitor daily limit reached" },
+    });
+    expect(limited.searchHybrid).not.toHaveBeenCalled();
+    expect(model.prompts).toEqual([]);
+  });
+
+  it("answers 503, as when live answers are off, once the site used up the day", async () => {
+    const limited = deps({
+      reserveSlot: vi.fn(async (): Promise<SlotOutcome> => "site-limit"),
+    });
+
+    const outcome = await handleAskRequest(limited, validPayload());
+
+    expect(outcome).toEqual({
+      status: 503,
+      body: { error: "site daily limit reached" },
+    });
+    expect(limited.searchHybrid).not.toHaveBeenCalled();
+  });
+
+  it("answers 500 and does not search when the limit cannot be checked", async () => {
+    const broken = deps({ reserveSlot: failing("banco fora do ar") });
+
+    const outcome = await handleAskRequest(broken, validPayload());
+
+    expect(outcome).toEqual({
+      status: 500,
+      body: { error: "could not check the daily limit" },
+    });
+    expect(broken.searchHybrid).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a question on a request it refuses as invalid", async () => {
+    const invalid = deps();
+
+    await handleAskRequest(invalid, validPayload({ question: "" }));
+
+    expect(invalid.reserveSlot).not.toHaveBeenCalled();
+  });
+
+  it("closes the day for the next visitors when the model's daily quota runs out", async () => {
+    const exhausted = deps({ model: rateLimited("day") });
+
+    const events = await eventsOf(
+      await handleAskRequest(exhausted, validPayload()),
+    );
+
+    expect(events.at(-1)).toMatchObject({ type: "error", reason: "quota" });
+    expect(exhausted.closeDay).toHaveBeenCalledOnce();
+    expect(exhausted.recordQuery).not.toHaveBeenCalled();
+  });
+
+  it("keeps the day open when the model is only busy for a minute", async () => {
+    const busy = deps({ model: rateLimited("minute") });
+
+    const events = await eventsOf(await handleAskRequest(busy, validPayload()));
+
+    expect(events.at(-1)).toMatchObject({ type: "error", reason: "busy" });
+    expect(busy.closeDay).not.toHaveBeenCalled();
+  });
+
+  it("still tells the visitor about the quota when closing the day fails", async () => {
+    const exhausted = deps({
+      model: rateLimited("day"),
+      closeDay: failing("banco fora do ar"),
+    });
+
+    const events = await eventsOf(
+      await handleAskRequest(exhausted, validPayload()),
+    );
+
+    expect(events.at(-1)).toMatchObject({ type: "error", reason: "quota" });
   });
 
   it("answers 200 with the sources, the search used, the text and the done event", async () => {
@@ -153,6 +269,7 @@ describe("handleAskRequest", () => {
 
   it("records the answered question with the chunks it saw and the time it took", async () => {
     const recorded = deps({
+      model: createFakeAnswerModel("O decreto saiu [1].", 7, 5_120),
       searchText: searchReturning([hit(7), hit(9)]),
       searchHybrid: unusedSearch(),
     });
@@ -170,6 +287,7 @@ describe("handleAskRequest", () => {
       model: "fake",
       promptVersion: PROMPT_VERSION,
       latencyMs: 250,
+      totalTokens: 5_120,
     });
   });
 
@@ -205,8 +323,10 @@ describe("handleAskRequest", () => {
     expect(events.at(-1)).toEqual({
       type: "error",
       message: "generation failed",
+      reason: "failed",
     });
     expect(broken.recordQuery).not.toHaveBeenCalled();
+    expect(broken.closeDay).not.toHaveBeenCalled();
   });
 
   it("answers not found without calling the model when the search finds nothing", async () => {

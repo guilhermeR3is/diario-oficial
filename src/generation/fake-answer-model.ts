@@ -9,6 +9,7 @@ const DEFAULT_PIECE_LENGTH = 7;
 export function createFakeAnswerModel(
   reply: string | ((prompt: Prompt) => string),
   pieceLength: number = DEFAULT_PIECE_LENGTH,
+  totalTokens?: number,
 ): FakeAnswerModel {
   const prompts: Prompt[] = [];
 
@@ -21,6 +22,7 @@ export function createFakeAnswerModel(
       for (let start = 0; start < text.length; start += pieceLength) {
         yield text.slice(start, start + pieceLength);
       }
+      return totalTokens;
     },
   };
 }

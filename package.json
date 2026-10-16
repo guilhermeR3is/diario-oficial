@@ -25,6 +25,7 @@
     "eval:injection": "tsx src/eval/injection-cli.ts",
     "eval:ask": "tsx src/eval/ask-proof-cli.ts",
     "embed": "tsx src/embedding/cli.ts",
+    "examples:generate": "tsx src/examples/cli.ts",
     "chunking:fixtures": "tsx src/chunking/save-fixtures.ts"
   },
   "dependencies": {
