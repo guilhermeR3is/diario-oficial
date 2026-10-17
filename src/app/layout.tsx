@@ -16,7 +16,7 @@ const text = Atkinson_Hyperlegible_Next({
 export const metadata: Metadata = {
   title: "Pergunte ao Diário Oficial",
   description:
-    "Pergunte em português sobre o Diário Oficial de São Luís (jul–set/2026) e receba a resposta com a edição, a página e o trecho original de cada afirmação. Projeto independente de portfólio.",
+    "Pergunte em português sobre o Diário Oficial de São Luís (jan–set/2026) e receba a resposta com a edição, a página e o trecho original de cada afirmação. Projeto independente de portfólio.",
 };
 
 export const viewport: Viewport = {

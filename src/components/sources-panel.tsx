@@ -48,7 +48,7 @@ export function SourcesPanel({
           </Cord>
           <p className="max-w-[44ch] text-sm leading-relaxed text-muted-foreground">
             {view.kind === "searching"
-              ? "Procurando os trechos mais próximos nos 7.926 trechos das 75 edições…"
+              ? "Procurando os trechos mais próximos nos 20.782 trechos das 230 edições…"
               : view.kind === "none"
                 ? "Nenhum trecho dos diários se parece com esta pergunta, então não há fonte para mostrar."
                 : "Cada resposta traz até seis trechos dos diários. Cada número na resposta abre o seu folheto aqui: o texto original, a edição, a data e a página."}

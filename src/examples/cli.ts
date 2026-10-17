@@ -5,6 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { loadEmbedder } from "@/embedding/gte-embedder";
 import { env } from "@/env";
 import { assertAllChunksHaveTheModelVector } from "@/eval/assert-chunk-vectors";
+import { QUESTION_SETS } from "@/eval/question-sets";
 import { parseQuestions } from "@/eval/questions";
 import {
   DEFAULT_PAUSE_SECONDS,
@@ -20,8 +21,6 @@ import {
   generateExamples,
   saveExamples,
 } from "./generate-examples";
-
-const QUESTIONS_FILE = "eval/questions.jsonl";
 
 async function confirm(message: string): Promise<boolean> {
   const terminal = createInterface({
@@ -42,9 +41,12 @@ async function main() {
   const yes = process.argv.includes("--yes");
   if (!env.GROQ_API_KEY) throw new Error("GROQ_API_KEY ausente no .env");
 
-  const examples = exampleQuestions(
-    parseQuestions(await readFile(QUESTIONS_FILE, "utf8")),
+  const questions = await Promise.all(
+    Object.values(QUESTION_SETS).map(async (set) =>
+      parseQuestions(await readFile(set.file, "utf8")),
+    ),
   );
+  const examples = exampleQuestions(questions.flat());
   const tokens = examples.length * TOKENS_PER_QUESTION;
   const minutes = Math.ceil(
     ((examples.length - 1) * DEFAULT_PAUSE_SECONDS) / 60,

@@ -7,7 +7,7 @@ export function SiteHeader() {
         </h1>
         <p className="text-sm leading-snug text-band-ink-soft lg:text-right">
           Projeto independente de portfólio, sem vínculo com a Prefeitura de São
-          Luís · diários de jul–set/2026
+          Luís · diários de jan–set/2026
         </p>
       </div>
     </header>

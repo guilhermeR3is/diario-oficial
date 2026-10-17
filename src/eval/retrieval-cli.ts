@@ -6,15 +6,18 @@ import { searchChunks } from "@/search/search-chunks";
 import { searchHybrid } from "@/search/search-hybrid";
 import { searchText } from "@/search/search-text";
 import { assertAllChunksHaveTheModelVector } from "./assert-chunk-vectors";
+import { QUESTION_SETS, parseQuestionSet } from "./question-sets";
 import { parseQuestions } from "./questions";
 import { formatReport } from "./report";
 import { SEARCH_LIMIT, runRetrieval } from "./run-retrieval";
 import { parseSubset, selectSubset } from "./subset";
 
 async function main() {
-  const subset = parseSubset(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const subset = parseSubset(args);
+  const setName = parseQuestionSet(args);
   const questions = selectSubset(
-    parseQuestions(await readFile("eval/questions.jsonl", "utf8")),
+    parseQuestions(await readFile(QUESTION_SETS[setName].file, "utf8")),
     subset,
   );
   await assertAllChunksHaveTheModelVector(db);
@@ -43,7 +46,9 @@ async function main() {
       ),
   });
 
-  process.stdout.write(`Subconjunto: ${subset}\n\n${formatReport(run)}`);
+  process.stdout.write(
+    `Perguntas: ${setName}; subconjunto: ${subset}\n\n${formatReport(run)}`,
+  );
 }
 
 main()

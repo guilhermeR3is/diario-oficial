@@ -4,14 +4,14 @@ import { generateAnswer } from "@/generation/generate-answer";
 import type { SearchHit } from "@/search/search-hit";
 import type { PrismaClient } from "../../generated/prisma/client";
 
-// o texto vem do eval/questions.jsonl pelo id, para a pergunta da tela ser a mesma que foi medida
+// o texto vem das perguntas da avaliação pelo id, para a pergunta da tela ser a mesma que foi medida
 export const EXAMPLES = [
   { slug: "merenda-escolar", questionId: "q11" },
   { slug: "trocador-de-bebe", questionId: "q16" },
   { slug: "dono-do-cnpj", questionId: "q05" },
-  { slug: "iluminacao-publica", questionId: "q27" },
   { slug: "concurso-do-hospital", questionId: "q22" },
-  { slug: "escola-de-samba", questionId: "q38" },
+  { slug: "reajuste-dos-professores", questionId: "q52" },
+  { slug: "metro-ou-vlt", questionId: "q38" },
 ] as const;
 
 export type GeneratedExample = {

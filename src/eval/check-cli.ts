@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import { db } from "@/lib/db";
 import { checkQuestions } from "./check-questions";
 import { loadChunkIndex } from "./chunk-index";
+import { QUESTION_SETS, parseQuestionSet } from "./question-sets";
 import { parseQuestions } from "./questions";
-
-const QUESTIONS_FILE = "eval/questions.jsonl";
 
 async function main() {
   const show = process.argv.includes("--show");
-  const questions = parseQuestions(await readFile(QUESTIONS_FILE, "utf8"));
+  const set = QUESTION_SETS[parseQuestionSet(process.argv.slice(2))];
+  const questions = parseQuestions(await readFile(set.file, "utf8"));
   const chunks = await loadChunkIndex(db);
 
   if (show) {
@@ -31,7 +31,7 @@ async function main() {
     process.stdout.write("\n");
   }
 
-  const problems = checkQuestions(questions, chunks);
+  const problems = checkQuestions(questions, chunks, set.expected);
   const answerable = questions.filter((q) => q.kind !== "unanswerable").length;
   process.stdout.write(
     `${questions.length} perguntas (${answerable} com resposta, ${questions.length - answerable} sem), ${problems.length} problema(s)\n`,

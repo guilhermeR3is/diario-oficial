@@ -37,7 +37,7 @@ export function QuestionForm({
       className="flex flex-col gap-2"
     >
       <label htmlFor="question" className="text-lg font-semibold">
-        Sua pergunta sobre os diários de julho a setembro de 2026
+        Sua pergunta sobre os diários de janeiro a setembro de 2026
       </label>
       <Textarea
         id="question"

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { QUESTION_SETS } from "@/eval/question-sets";
 import { type EvalQuestion, parseQuestions } from "@/eval/questions";
 import type { AnswerModel } from "@/generation/answer-model";
 import { PROMPT_VERSION } from "@/generation/build-prompt";
@@ -48,8 +49,11 @@ function deps(overrides: Partial<ExampleDeps> = {}) {
 }
 
 describe("exampleQuestions", () => {
-  const questions = parseQuestions(
-    readFileSync("eval/questions.jsonl", "utf8"),
+  const questions = Object.values(QUESTION_SETS).flatMap((set) =>
+    parseQuestions(readFileSync(set.file, "utf8")),
+  );
+  const exampleIds = new Set<string>(
+    EXAMPLES.map((example) => example.questionId),
   );
 
   it("takes the six examples, word for word, from the measured questions", () => {
@@ -64,12 +68,21 @@ describe("exampleQuestions", () => {
   });
 
   it("includes one question the diaries cannot answer, to show the refusal", () => {
-    const ids = new Set<string>(EXAMPLES.map((example) => example.questionId));
     const kinds = questions
-      .filter((question) => ids.has(question.id))
+      .filter((question) => exampleIds.has(question.id))
       .map((question) => question.kind);
 
     expect(kinds.filter((kind) => kind === "unanswerable")).toHaveLength(1);
+  });
+
+  it("shows at least one fact from the months added later, January to June", () => {
+    const janJun = new Set(
+      parseQuestions(readFileSync(QUESTION_SETS["jan-jun"].file, "utf8")).map(
+        (question) => question.id,
+      ),
+    );
+
+    expect([...exampleIds].some((id) => janJun.has(id))).toBe(true);
   });
 
   it("fails when a chosen question no longer exists", () => {
