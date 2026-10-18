@@ -15,6 +15,11 @@ export type ExampleAnswer = {
   generatedAt: string;
 };
 
+// os exemplos só mudam com um novo seed:demo; enquanto isso a CDN da Vercel responde sem acordar o banco
+export const EXAMPLE_CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+};
+
 export const sourceKeysSchema = z.array(
   z.strictObject({ sourceUrl: z.string().min(1), ordinal: z.number().int() }),
 );

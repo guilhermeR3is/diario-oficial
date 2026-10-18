@@ -31,10 +31,12 @@ export function HowItWorks() {
             <dd>só palavras exatas</dd>
           </dl>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Medido em 35 perguntas de teste com resposta conhecida, escritas
-            pelo Claude (a IA que ajudou a construir o projeto), e não por
-            usuários. Em 14 perguntas novas sobre jan–jun, escritas depois e sem
-            nenhum ajuste na busca, a híbrida acertou 86%.
+            Medido em 56 perguntas de teste com gabarito conferido no texto dos
+            diários. Os números acima são das 35 com resposta sobre{" "}
+            <span className="whitespace-nowrap">jul–set</span>; em 14 escritas
+            depois sobre <span className="whitespace-nowrap">jan–jun</span>, sem
+            nenhum ajuste na busca, a híbrida acertou 86%. As outras 7 não têm
+            resposta nos diários, e o sistema disse “não encontrei” nas 7.
           </p>
         </div>
       </div>

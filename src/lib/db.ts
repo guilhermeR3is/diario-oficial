@@ -1,9 +1,16 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { attachDatabasePool } from "@vercel/functions";
+import { Pool } from "pg";
 import { env } from "@/env";
 import { PrismaClient } from "../../generated/prisma/client";
 
 export function createDb(connectionString: string) {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  // a Vercel congela a função parada e o Neon dorme após 5 min: a conexão ociosa fecha antes, e a Vercel espera esse fechamento
+  const pool = new Pool({ connectionString, idleTimeoutMillis: 5_000 });
+  attachDatabasePool(pool);
+  return new PrismaClient({
+    adapter: new PrismaPg(pool, { disposeExternalPool: true }),
+  });
 }
 
 const globalForDb = globalThis as unknown as { db?: PrismaClient };

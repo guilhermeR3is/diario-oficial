@@ -17,6 +17,7 @@ export async function startTestDatabase() {
 
   return {
     db,
+    url,
     async stop() {
       await db.$disconnect();
       await container.stop();

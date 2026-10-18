@@ -1,4 +1,4 @@
-import { loadExample } from "@/examples/cached-answers";
+import { EXAMPLE_CACHE_HEADERS, loadExample } from "@/examples/cached-answers";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -12,7 +12,7 @@ export async function GET(
   try {
     const example = await loadExample(db, slug);
     return example
-      ? Response.json(example)
+      ? Response.json(example, { headers: EXAMPLE_CACHE_HEADERS })
       : Response.json({ error: "example not found" }, { status: 404 });
   } catch (error) {
     logger.error({ err: error, slug }, "example failed to load");

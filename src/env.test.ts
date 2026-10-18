@@ -62,6 +62,19 @@ describe("parseEnv", () => {
     expect(env.GROQ_API_KEY).toBe("chave-de-teste");
   });
 
+  it("treats a blank demo database address as missing and trims a filled one", () => {
+    expect(parseEnv(validSource).DEMO_DATABASE_URL).toBeUndefined();
+    expect(
+      parseEnv({ ...validSource, DEMO_DATABASE_URL: " " }).DEMO_DATABASE_URL,
+    ).toBeUndefined();
+    expect(
+      parseEnv({
+        ...validSource,
+        DEMO_DATABASE_URL: " postgresql://neon.test/demo\n",
+      }).DEMO_DATABASE_URL,
+    ).toBe("postgresql://neon.test/demo");
+  });
+
   it.each([undefined, "", "   "])(
     "fails when live mode is on and the Groq key is missing (%j)",
     (key) => {

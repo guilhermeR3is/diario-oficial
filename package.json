@@ -26,18 +26,21 @@
     "eval:ask": "tsx src/eval/ask-proof-cli.ts",
     "embed": "tsx src/embedding/cli.ts",
     "examples:generate": "tsx src/examples/cli.ts",
+    "seed:demo": "tsx src/seed/cli.ts",
     "chunking:fixtures": "tsx src/chunking/save-fixtures.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "@vercel/functions": "3.9.11",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "dotenv": "^18.0.5",
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.57.0",
     "next": "16.3.8",
+    "pg": "8.23.1",
     "pino": "^10.4.0",
     "radix-ui": "^1.8.1",
     "react": "19.2.8",
@@ -52,6 +55,7 @@
     "@tailwindcss/postcss": "^4",
     "@testcontainers/postgresql": "12.2.0",
     "@types/node": "^24.19.1",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -63,5 +67,8 @@
     "typescript": "^5",
     "vitest": "^5.0.3"
   },
-  "packageManager": "pnpm@11.15.1"
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": "24.x"
+  }
 }

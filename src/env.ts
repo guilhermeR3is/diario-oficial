@@ -18,6 +18,11 @@ const envSchema = z
     // a cota gratuita da Groq (200 mil tokens por dia) é uma só para o site inteiro; uma pergunta gasta ~5 mil
     LIVE_DAILY_LIMIT: z.coerce.number().int().min(1).default(30),
     VISITOR_DAILY_LIMIT: z.coerce.number().int().min(1).default(5),
+    // só o pnpm seed:demo lê; conexão direta, sem o pooler, porque o Neon manda rodar migrations por ela
+    DEMO_DATABASE_URL: z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || undefined),
     GENERATION_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
     FIDELITY_MODEL: z.string().min(1).default("qwen/qwen3.8-27b"),
     VERCEL_GIT_COMMIT_SHA: z.string().optional(),
