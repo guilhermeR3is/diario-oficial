@@ -20,6 +20,7 @@ import { latestResults, readResults } from "./generation-result";
 import type { GenerationResult } from "./generation-result";
 import { keyOf } from "./metrics";
 import { runPaced } from "./paced-run";
+import { QUESTION_SETS, parseQuestionSet } from "./question-sets";
 import { type EvalQuestion, parseQuestions } from "./questions";
 import { parseGenerationArgs } from "./run-generation";
 import {
@@ -29,7 +30,6 @@ import {
   pendingFidelity,
 } from "./run-fidelity";
 
-const QUESTIONS_FILE = "eval/questions.jsonl";
 const GENERATION_FILE = "data/eval/generation.jsonl";
 const FIDELITY_FILE = "data/eval/fidelity.jsonl";
 const SAMPLE_FILE = "data/eval/fidelity-sample.md";
@@ -169,8 +169,9 @@ async function writeSample(
 async function main() {
   const rawArgs = process.argv.slice(2);
   const sampleOnly = rawArgs.includes("--sample");
+  const set = QUESTION_SETS[parseQuestionSet(rawArgs)];
   const args = parseGenerationArgs(
-    rawArgs.filter((arg) => arg !== "--sample"),
+    rawArgs.filter((arg) => arg !== "--sample" && !arg.startsWith("--set=")),
     DEFAULTS,
   );
   if (args.only.length > 0 && !sampleOnly) {
@@ -179,7 +180,8 @@ async function main() {
   if (args.promptVersion && !args.reportOnly && !sampleOnly) {
     throw new Error("--prompt-version vale só com --report ou --sample");
   }
-  const questions = parseQuestions(await readFile(QUESTIONS_FILE, "utf8"));
+  const questions = parseQuestions(await readFile(set.file, "utf8"));
+  const inSet = new Set(questions.map((question) => question.id));
   const current = {
     verifier: env.FIDELITY_MODEL,
     promptVersion: FIDELITY_PROMPT_VERSION,
@@ -189,7 +191,8 @@ async function main() {
       model: env.GENERATION_MODEL,
       promptVersion: args.promptVersion ?? PROMPT_VERSION,
     }).values(),
-  ];
+    // só as respostas do conjunto escolhido; sem isto, o verificador refaria as de outro conjunto e gastaria cota
+  ].filter((generation) => inSet.has(generation.id));
 
   if (!args.reportOnly && !sampleOnly) {
     await evaluate(generations, current, args);

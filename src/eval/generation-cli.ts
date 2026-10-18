@@ -12,6 +12,7 @@ import { searchHybrid } from "@/search/search-hybrid";
 import { assertAllChunksHaveTheModelVector } from "./assert-chunk-vectors";
 import { formatGenerationReport } from "./generation-report";
 import { appendResult, latestResults, readResults } from "./generation-result";
+import { QUESTION_SETS, parseQuestionSet } from "./question-sets";
 import { type EvalQuestion, parseQuestions } from "./questions";
 import {
   type GenerationArgs,
@@ -21,7 +22,6 @@ import {
   runPending,
 } from "./run-generation";
 
-const QUESTIONS_FILE = "eval/questions.jsonl";
 const RESULTS_FILE = "data/eval/generation.jsonl";
 
 async function confirm(message: string): Promise<boolean> {
@@ -109,8 +109,12 @@ async function evaluate(
 }
 
 async function main() {
-  const args = parseGenerationArgs(process.argv.slice(2));
-  const questions = parseQuestions(await readFile(QUESTIONS_FILE, "utf8"));
+  const rawArgs = process.argv.slice(2);
+  const set = QUESTION_SETS[parseQuestionSet(rawArgs)];
+  const args = parseGenerationArgs(
+    rawArgs.filter((arg) => !arg.startsWith("--set=")),
+  );
+  const questions = parseQuestions(await readFile(set.file, "utf8"));
   if (args.only.length > 0)
     throw new Error("--only vale só no eval:fidelity --sample");
   if (args.promptVersion && !args.reportOnly) {
