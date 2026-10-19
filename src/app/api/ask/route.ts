@@ -2,7 +2,7 @@ import { env } from "@/env";
 import { toEventStream } from "@/generation/event-stream";
 import { createGroqAnswerModel } from "@/generation/groq-answer-model";
 import { SOURCE_COUNT, handleAskRequest } from "@/generation/handle-ask";
-import { recordQuery } from "@/generation/query-log";
+import { recordAskFailure, recordQuery } from "@/generation/query-log";
 import { closeLiveDay, liveDay, reserveLiveSlot } from "@/limits/live-limits";
 import { hashVisitor, visitorIp } from "@/limits/visitor";
 import { db } from "@/lib/db";
@@ -46,6 +46,8 @@ export async function POST(request: Request) {
       reserveSlot: () => reserveLiveSlot(db, { day, visitorHash, limits }),
       closeDay: () => closeLiveDay(db, { day, siteLimit: limits.site }),
       recordQuery: (record) => recordQuery(db, { ...record, visitorHash }),
+      recordFailure: (failure) =>
+        recordAskFailure(db, { ...failure, visitorHash }),
       now: () => performance.now(),
     },
     payload,

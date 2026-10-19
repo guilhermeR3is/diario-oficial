@@ -107,6 +107,22 @@ model QueryLog {
   @@map("query_log")
 }
 
+// uma linha por pergunta livre que falhou depois de reservar a vaga; o log da Vercel Hobby guarda só 1 hora
+model AskFailure {
+  id          String   @id @default(uuid()) @db.Uuid
+  // search ou generation
+  stage       String
+  // o mesmo motivo que o visitante recebe: busy, quota ou failed
+  reason      String
+  // mensagem do erro, inclusive a do provedor; nunca vai para a tela
+  detail      String
+  searchMode  String   @map("search_mode")
+  visitorHash String?  @map("visitor_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("ask_failure")
+}
+
 // uma linha por dia e chave ("site" ou o hash de um visitante); somar e conferir o limite é uma instrução só, então pedidos simultâneos não passam do limite
 model LiveUsage {
   day   DateTime @db.Date

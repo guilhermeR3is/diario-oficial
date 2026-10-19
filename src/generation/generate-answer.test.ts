@@ -179,7 +179,7 @@ describe("generateAnswer", () => {
     expect(types(events)).toEqual(["sources", "error"]);
   });
 
-  it("does not pass the provider's error message on to the client", async () => {
+  it("keeps the provider's error message out of the message and reason, only in the detail for the failure log", async () => {
     const model = failingModel(
       [],
       new Error("provider exploded: internal detail 42"),
@@ -192,8 +192,16 @@ describe("generateAnswer", () => {
       type: "error",
       message: "generation failed",
       reason: "failed",
+      detail: "provider exploded: internal detail 42",
     });
-    expect(JSON.stringify(events)).not.toContain("internal detail");
+  });
+
+  it("cuts a long error message in the detail", async () => {
+    const model = failingModel([], new Error("x".repeat(800)));
+
+    const events = await collect(generateAnswer(model, "pergunta", hits));
+
+    expect(events.at(-1)).toMatchObject({ detail: "x".repeat(500) });
   });
 
   it.each(["", "   \n"])(
@@ -208,6 +216,7 @@ describe("generateAnswer", () => {
         type: "error",
         message: "generation failed",
         reason: "failed",
+        detail: "model returned an empty answer",
       });
     },
   );
@@ -249,12 +258,13 @@ describe("generateAnswer", () => {
 
       const events = await collect(generateAnswer(model, "pergunta", hits));
 
+      // a causa é a mensagem da Groq, que diz qual limite estourou
       expect(events.at(-1)).toEqual({
         type: "error",
         message: "model rate limit reached",
         reason,
+        detail: `model rate limit reached (${window}): org_secret detail`,
       });
-      expect(JSON.stringify(events)).not.toContain("org_secret");
     },
   );
 

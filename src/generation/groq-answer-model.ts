@@ -1,4 +1,5 @@
-import Groq, { RateLimitError } from "groq-sdk";
+import { setTimeout as sleep } from "node:timers/promises";
+import Groq, { APIError, RateLimitError } from "groq-sdk";
 import { logger } from "@/lib/logger";
 import {
   type AnswerModel,
@@ -37,6 +38,18 @@ export function rateLimitWindow(retryAfter: string | null): RateLimitWindow {
   return seconds >= 0 && seconds <= MINUTE_WINDOW_SECONDS ? "minute" : "day";
 }
 
+const DEFAULT_RETRY_DELAY_MS = 1_000;
+
+// o limite tem regra própria (busy ou quota); um 4xx é o pedido recusado (chave, modelo, parâmetro) e repetiria igual
+function isWorthRetrying(error: unknown): boolean {
+  if (error instanceof ModelRateLimitError) return false;
+  return !(
+    error instanceof APIError &&
+    typeof error.status === "number" &&
+    error.status < 500
+  );
+}
+
 export function createGroqAnswerModel(options: {
   apiKey: string;
   model: string;
@@ -44,6 +57,7 @@ export function createGroqAnswerModel(options: {
   maxCompletionTokens?: number;
   // o SDK espera o retry-after inteiro, sem teto: no limite diário seriam horas com o visitante esperando
   maxRetries?: number;
+  retryDelayMs?: number;
 }): AnswerModel {
   const client = new Groq({
     apiKey: options.apiKey,
@@ -53,36 +67,54 @@ export function createGroqAnswerModel(options: {
   return {
     name: options.model,
     async *stream(prompt) {
-      const completion = await client.chat.completions
-        .create({
-          model: options.model,
-          messages: [
-            { role: "system", content: prompt.system },
-            { role: "user", content: prompt.user },
-          ],
-          stream: true,
-          max_completion_tokens:
-            options.maxCompletionTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
-          // só vale para modelos de raciocínio (gpt-oss); outro modelo pode recusar estes dois parâmetros
-          reasoning_effort: "low",
-          include_reasoning: false,
-        })
-        .catch((error: unknown) => {
-          if (!(error instanceof RateLimitError)) throw error;
-          throw new ModelRateLimitError(
-            rateLimitWindow(error.headers.get("retry-after")),
-            { cause: error },
-          );
-        });
-
       let finishReason: string | null = null;
       let usage: { total_tokens?: number } | null | undefined;
-      for await (const chunk of completion) {
-        const choice = chunk.choices[0];
-        if (choice?.delta.content)
-          yield toPlainTypography(choice.delta.content);
-        if (choice?.finish_reason) finishReason = choice.finish_reason;
-        if (chunk.x_groq?.usage) usage = chunk.x_groq.usage;
+      // uma falha da Groq ou da rede antes da primeira palavra costuma passar na segunda tentativa; depois dela, o visitante já leu parte da resposta
+      for (let attempt = 1; ; attempt++) {
+        let wrote = false;
+        try {
+          const completion = await client.chat.completions
+            .create({
+              model: options.model,
+              messages: [
+                { role: "system", content: prompt.system },
+                { role: "user", content: prompt.user },
+              ],
+              stream: true,
+              max_completion_tokens:
+                options.maxCompletionTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+              // só vale para modelos de raciocínio (gpt-oss); outro modelo pode recusar estes dois parâmetros
+              reasoning_effort: "low",
+              include_reasoning: false,
+            })
+            .catch((error: unknown) => {
+              if (!(error instanceof RateLimitError)) throw error;
+              throw new ModelRateLimitError(
+                rateLimitWindow(error.headers.get("retry-after")),
+                { cause: error },
+              );
+            });
+
+          finishReason = null;
+          usage = undefined;
+          for await (const chunk of completion) {
+            const choice = chunk.choices[0];
+            if (choice?.delta.content) {
+              wrote = true;
+              yield toPlainTypography(choice.delta.content);
+            }
+            if (choice?.finish_reason) finishReason = choice.finish_reason;
+            if (chunk.x_groq?.usage) usage = chunk.x_groq.usage;
+          }
+          break;
+        } catch (error) {
+          if (wrote || attempt > 1 || !isWorthRetrying(error)) throw error;
+          logger.warn(
+            { err: error, model: options.model },
+            "groq failed before the first word, trying once more",
+          );
+          await sleep(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+        }
       }
 
       logger.info(

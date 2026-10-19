@@ -67,12 +67,14 @@ describe("exampleQuestions", () => {
     });
   });
 
-  it("includes one question the diaries cannot answer, to show the refusal", () => {
+  // decisão do autor em 19/10/2026: o exemplo é a primeira coisa que o visitante clica e precisa ter resposta
+  it("only shows questions the diaries answer", () => {
     const kinds = questions
       .filter((question) => exampleIds.has(question.id))
       .map((question) => question.kind);
 
-    expect(kinds.filter((kind) => kind === "unanswerable")).toHaveLength(1);
+    expect(kinds).toHaveLength(6);
+    expect(kinds).not.toContain("unanswerable");
   });
 
   it("shows at least one fact from the months added later, January to June", () => {
@@ -86,11 +88,11 @@ describe("exampleQuestions", () => {
   });
 
   it("fails when a chosen question no longer exists", () => {
-    const withoutQ05 = questions.filter(
-      (question: EvalQuestion) => question.id !== "q05",
+    const withoutQ02 = questions.filter(
+      (question: EvalQuestion) => question.id !== "q02",
     );
 
-    expect(() => exampleQuestions(withoutQ05)).toThrow(/q05/);
+    expect(() => exampleQuestions(withoutQ02)).toThrow(/q02/);
   });
 });
 

@@ -18,16 +18,31 @@ export type AnswerEvent =
       // null quando o provedor não informou o consumo
       totalTokens: number | null;
     }
-  // busy: limite por minuto do provedor; quota: a cota do dia acabou
-  | { type: "error"; message: string; reason: GenerationFailure };
+  // busy: limite por minuto do provedor; quota: a cota do dia acabou; detail é só para o registro de falhas do servidor
+  | {
+      type: "error";
+      message: string;
+      reason: GenerationFailure;
+      detail: string;
+    };
 
 export type GenerationFailure = "busy" | "quota" | "failed";
 
-const FAILED: AnswerEvent = {
+const FAILED = {
   type: "error",
   message: "generation failed",
   reason: "failed",
-};
+} as const;
+
+const MAX_DETAIL_LENGTH = 500;
+
+/** Mensagem do erro, com a da causa (o 429 da Groq diz ali qual limite estourou), cortada para o registro de falhas. */
+export function describeError(error: unknown): string {
+  if (!(error instanceof Error))
+    return String(error).slice(0, MAX_DETAIL_LENGTH);
+  const cause = error.cause instanceof Error ? `: ${error.cause.message}` : "";
+  return `${error.message}${cause}`.slice(0, MAX_DETAIL_LENGTH);
+}
 
 export async function* generateAnswer(
   model: AnswerModel,
@@ -66,20 +81,21 @@ export async function* generateAnswer(
 
   if (answer.trim() === "") {
     logger.error({ model: model.name }, "model returned an empty answer");
-    yield FAILED;
+    yield { ...FAILED, detail: "model returned an empty answer" };
     return;
   }
 
   yield doneEvent(model, answer, hits.length, totalTokens ?? null);
 }
 
-// o erro do provedor pode trazer detalhes internos, então o cliente só recebe o motivo
 function failureEvent(error: unknown): AnswerEvent {
-  if (!(error instanceof ModelRateLimitError)) return FAILED;
+  const detail = describeError(error);
+  if (!(error instanceof ModelRateLimitError)) return { ...FAILED, detail };
   return {
     type: "error",
     message: "model rate limit reached",
     reason: error.window === "day" ? "quota" : "busy",
+    detail,
   };
 }
 

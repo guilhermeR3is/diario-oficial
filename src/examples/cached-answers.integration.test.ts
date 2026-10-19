@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { recordFeedback, recordQuery } from "@/generation/query-log";
+import {
+  recordAskFailure,
+  recordFeedback,
+  recordQuery,
+} from "@/generation/query-log";
 import { startTestDatabase } from "@/test/database";
 import { listExamples, loadExample } from "./cached-answers";
 import { type GeneratedExample, saveExamples } from "./generate-examples";
@@ -212,6 +216,33 @@ describe("cached answers and the query log", () => {
     expect(await listExamples(db)).toEqual([
       { slug: "provisoria", question: "pergunta provisoria?" },
     ]);
+  });
+
+  it("records a failed question with its stage, reason, detail and time, without touching the query log", async () => {
+    const before = await db.queryLog.count();
+
+    await recordAskFailure(db, {
+      stage: "generation",
+      reason: "failed",
+      detail: "503 over capacity",
+      searchMode: "hybrid",
+      visitorHash: "a".repeat(64),
+    });
+
+    const [failure] = await db.askFailure.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+    expect(failure).toMatchObject({
+      stage: "generation",
+      reason: "failed",
+      detail: "503 over capacity",
+      searchMode: "hybrid",
+      visitorHash: "a".repeat(64),
+    });
+    expect(failure!.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(Date.now() - failure!.createdAt.getTime()).toBeLessThan(60_000);
+    expect(await db.queryLog.count()).toBe(before);
   });
 
   it("reports an unknown query id instead of creating feedback out of nowhere", async () => {

@@ -31,7 +31,7 @@ O Diário Oficial não é um jornal: ele traz os atos que a prefeitura é obriga
 Perguntas que deram certo nas avaliações, por assunto:
 
 - **Compras e contratos:** "A prefeitura comprou alguma ambulância e quanto pagou por ela?" · "A prefeitura comprou câmeras capazes de reconhecer o rosto das pessoas?"
-- **Empresas:** "A qual empresa pertence o CNPJ 31.907.728/0001-25?"
+- **Contratos e empresas:** "Qual empresa foi contratada pelo Fundo Municipal de Saúde no contrato nº 468/2026?" · "O que diz a Portaria nº 1.346/2026 sobre o contrato nº 369/2026?"
 - **Leis e programas:** "A prefeitura criou algum programa para ensinar a socorrer quem está engasgado?" · "Existe uma política da prefeitura para plantar e cuidar das árvores da cidade?"
 - **Orçamento e impostos:** "Qual é a receita estimada no orçamento de São Luís para 2026?" · "Até que dia podia ser pago o ISSQN da competência de dezembro de 2025, segundo o Decreto nº 62.200?"
 - **Servidores e cargos:** "De quanto foi o reajuste dos professores da rede municipal aprovado em fevereiro de 2026?" · "Quantos cargos de agente de trânsito foram criados na SMTT em 2026?"
@@ -77,7 +77,7 @@ flowchart LR
 - **96 respostas geradas pelo modelo real** em duas versões do prompt, conferidas quanto à recusa correta, à citação válida e ao trecho certo citado.
 - **Fidelidade:** cada afirmação conferida por um segundo modelo contra o trecho que ela cita, e amostras conferidas uma a uma contra o texto original.
 - **Injeção de prompt:** ordens falsas escondidas no texto dos diários, com grupo de controle.
-- **869 testes automáticos**, unitários e de integração com um Postgres real em contêiner descartável, rodando no CI a cada push. Ao longo do projeto, o código foi quebrado de propósito dezenas de vezes para provar que os testes pegam o erro.
+- **884 testes automáticos**, unitários e de integração com um Postgres real em contêiner descartável, rodando no CI a cada push. Ao longo do projeto, o código foi quebrado de propósito dezenas de vezes para provar que os testes pegam o erro.
 - **Concorrência:** 20 pedidos simultâneos com limite 3 resultam em exatamente 3 aceitos.
 - **Demonstração publicada** conferida no navegador em 1440 e 375 px, com uma pergunta real.
 
@@ -129,7 +129,7 @@ Os números de geração das 40 perguntas foram medidos com o corpus de julho a 
 Funciona bem:
 
 - Perguntas com outras palavras: "A prefeitura comprou comida de agricultores familiares para a merenda das escolas?" acha a homologação da chamada pública do PNAE (R$ 4.230.000,00).
-- Perguntas por número: "A qual empresa pertence o CNPJ 45.734.817/0001-21?".
+- Perguntas por número: "Qual empresa foi contratada pelo Fundo Municipal de Saúde no contrato nº 468/2026?".
 - Perguntas sem resposta: "A prefeitura vai construir uma linha de metrô ou VLT em São Luís?" recebe "não encontrei".
 
 Não funciona bem:
@@ -162,6 +162,7 @@ A cota gratuita é uma só para o site inteiro, então a demonstração tem limi
 - **Modelo de vetores:** cinco modelos multilíngues foram comparados em 2.400 trechos reais. O `gte-multilingual-base` (Apache-2.0) foi o melhor em sentido e em números exatos e cabe no navegador do visitante, o que evita um servidor de vetores pago.
 - **Busca vetorial exata, sem índice aproximado:** com 20 mil trechos, comparar a pergunta com todos leva de 50 a 70 ms no computador e cerca de 180 ms no Neon, medidos de fora, com a ida e volta da rede. O índice HNSW seria mais rápido, mas o Prisma não o reconhece e tentaria apagá-lo a cada migration.
 - **Modelo gratuito atrás de uma interface:** a geração usa a Groq pela interface `AnswerModel`, com uma versão simulada nos testes; nenhum teste automático chama a API real.
+- **Falhas do modelo:** se a Groq falhar antes de escrever a primeira palavra (erro do lado dela ou conexão caída), o servidor tenta mais uma vez, depois de 1 s; recusas do pedido e limites de uso não são repetidos. Toda falha depois de a pergunta ser aceita fica gravada no banco com o motivo, porque o registro do plano gratuito da Vercel dura só 1 hora.
 - **Publicação:** Vercel e Neon, os dois em São Paulo, perto de quem deve visitar. As conexões com o banco fecham depois de 5 s paradas, porque a Vercel congela a função e o Neon dorme depois de 5 min sem uso.
 
 ## Rodar localmente
@@ -181,7 +182,7 @@ pnpm dev
 
 As perguntas de exemplo precisam de uma chave da Groq (`GROQ_API_KEY` no `.env`, plano Free) e de `pnpm examples:generate`, que mostra a estimativa de tokens antes de gastar. Para a pergunta livre, `LIVE_MODE=on` e `VISITOR_HASH_SECRET` (gere com `openssl rand -hex 32`).
 
-Outros comandos: `pnpm test` (869 testes; os de integração sobem um Postgres descartável com Testcontainers), `pnpm lint`, `pnpm typecheck`, `pnpm chunk:stats`, `pnpm eval:check`, `pnpm eval:retrieval`, `pnpm eval:generation` e `pnpm eval:fidelity` (estes dois chamam a Groq e mostram a estimativa antes).
+Outros comandos: `pnpm test` (884 testes; os de integração sobem um Postgres descartável com Testcontainers), `pnpm lint`, `pnpm typecheck`, `pnpm chunk:stats`, `pnpm eval:check`, `pnpm eval:retrieval`, `pnpm eval:generation` e `pnpm eval:fidelity` (estes dois chamam a Groq e mostram a estimativa antes).
 
 ## Publicar
 

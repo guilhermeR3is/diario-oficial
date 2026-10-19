@@ -8,10 +8,10 @@ import type { PrismaClient } from "../../generated/prisma/client";
 export const EXAMPLES = [
   { slug: "merenda-escolar", questionId: "q11" },
   { slug: "trocador-de-bebe", questionId: "q16" },
-  { slug: "dono-do-cnpj", questionId: "q05" },
+  { slug: "empresa-do-contrato", questionId: "q02" },
   { slug: "concurso-do-hospital", questionId: "q22" },
   { slug: "reajuste-dos-professores", questionId: "q52" },
-  { slug: "metro-ou-vlt", questionId: "q38" },
+  { slug: "compra-de-ambulancia", questionId: "q13" },
 ] as const;
 
 export type GeneratedExample = {

@@ -4,8 +4,12 @@ import { logger } from "@/lib/logger";
 import { searchRequestSchema } from "@/search/handle-search";
 import type { SearchHit } from "@/search/search-hit";
 import type { AnswerModel } from "./answer-model";
-import { type AnswerEvent, generateAnswer } from "./generate-answer";
-import type { QueryRecord } from "./query-log";
+import {
+  type AnswerEvent,
+  describeError,
+  generateAnswer,
+} from "./generate-answer";
+import type { FailureRecord, QueryRecord } from "./query-log";
 
 export const SOURCE_COUNT = 6;
 
@@ -31,14 +35,19 @@ const askRequestSchema = z
 
 type DoneEvent = Extract<AnswerEvent, { type: "done" }>;
 
+type ErrorEvent = Extract<AnswerEvent, { type: "error" }>;
+
 export type AskEvent =
-  | Exclude<AnswerEvent, { type: "sources" | "done" }>
+  | Exclude<AnswerEvent, { type: "sources" | "done" | "error" }>
   | { type: "sources"; sources: SearchHit[]; searchMode: SearchMode }
+  // a mensagem do provedor pode trazer detalhes internos: fica no registro de falhas e o visitante só recebe o motivo
+  | Omit<ErrorEvent, "detail">
   // queryId null: a resposta saiu, mas o registro falhou e não há onde gravar o feedback
   | (DoneEvent & { queryId: string | null });
 
 // o hash do visitante é acrescentado por quem conhece o pedido HTTP (a rota)
 export type AskRecord = Omit<QueryRecord, "visitorHash">;
+export type AskFailure = Omit<FailureRecord, "visitorHash">;
 
 export type AskDependencies = {
   // sem modelo (LIVE_MODE=off) não há resposta ao vivo
@@ -54,6 +63,8 @@ export type AskDependencies = {
   // a cota diária do modelo acabou: os próximos visitantes já recebem 503, sem gastar uma pergunta
   closeDay: () => Promise<void>;
   recordQuery: (record: AskRecord) => Promise<string>;
+  // o log da Vercel Hobby dura 1 hora; a falha gravada no banco ainda explica o erro no dia seguinte
+  recordFailure: (failure: AskFailure) => Promise<void>;
   now: () => number;
 };
 
@@ -69,6 +80,7 @@ export async function handleAskRequest(
     reserveSlot,
     closeDay,
     recordQuery,
+    recordFailure,
     now,
   }: AskDependencies,
   payload: unknown,
@@ -106,6 +118,12 @@ export async function handleAskRequest(
       : await searchText(question);
   } catch (error) {
     logger.error({ err: error, searchMode }, "search failed");
+    await recordFailureLogged(recordFailure, {
+      stage: "search",
+      reason: "failed",
+      detail: describeError(error),
+      searchMode,
+    });
     return { status: 500, body: { error: "search failed" } };
   }
 
@@ -116,6 +134,7 @@ export async function handleAskRequest(
       searchMode,
       hits,
       recordQuery,
+      recordFailure,
       closeDay,
       latencyMs: () => Math.round(now() - startedAt),
     }),
@@ -129,6 +148,7 @@ async function* finishAsk(
     searchMode: SearchMode;
     hits: SearchHit[];
     recordQuery: AskDependencies["recordQuery"];
+    recordFailure: AskDependencies["recordFailure"];
     closeDay: AskDependencies["closeDay"];
     latencyMs: () => number;
   },
@@ -138,9 +158,15 @@ async function* finishAsk(
       yield { ...event, searchMode: context.searchMode };
     } else if (event.type === "done") {
       yield { ...event, queryId: await record(event, context) };
-    } else if (event.type === "error" && event.reason === "quota") {
-      await closeDayLogged(context.closeDay);
-      yield event;
+    } else if (event.type === "error") {
+      if (event.reason === "quota") await closeDayLogged(context.closeDay);
+      await recordFailureLogged(context.recordFailure, {
+        stage: "generation",
+        reason: event.reason,
+        detail: event.detail,
+        searchMode: context.searchMode,
+      });
+      yield { type: "error", message: event.message, reason: event.reason };
     } else {
       yield event;
     }
@@ -166,6 +192,18 @@ async function record(
     // o visitante já tem a resposta; perder o registro só desliga o feedback dela
     logger.error({ err: error }, "query log failed");
     return null;
+  }
+}
+
+async function recordFailureLogged(
+  recordFailure: AskDependencies["recordFailure"],
+  failure: AskFailure,
+) {
+  try {
+    await recordFailure(failure);
+  } catch (error) {
+    // o visitante recebe o erro mesmo assim; só o diagnóstico se perde
+    logger.error({ err: error }, "failure log failed");
   }
 }
 

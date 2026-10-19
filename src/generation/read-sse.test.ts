@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeSseEvent, toEventStream } from "./event-stream";
-import type { AnswerEvent } from "./generate-answer";
+import type { AskEvent } from "./handle-ask";
 import { type SseMessage, readSse } from "./read-sse";
 
 const streamOf = (chunks: Uint8Array[]) =>
@@ -93,7 +93,7 @@ describe("readSse", () => {
   });
 
   it("reads back what the server encodes", async () => {
-    const events: AnswerEvent[] = [
+    const events: AskEvent[] = [
       { type: "delta", text: "O valor é R$ 1.000,00. [1]" },
       { type: "error", message: "generation failed", reason: "failed" },
     ];

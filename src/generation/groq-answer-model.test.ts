@@ -4,19 +4,31 @@ import { ModelRateLimitError } from "./answer-model";
 import { createGroqAnswerModel, rateLimitWindow } from "./groq-answer-model";
 import { parseCitations } from "./parse-citations";
 
-const { create, clientCreated, logInfo, RateLimitError } = vi.hoisted(() => ({
-  create: vi.fn(),
-  clientCreated: vi.fn(),
-  logInfo: vi.fn(),
-  // o SDK real devolve os cabeçalhos da resposta 429 no erro
-  RateLimitError: class extends Error {
-    constructor(readonly headers: Headers) {
-      super("429 Rate limit reached");
-    }
-  },
-}));
+const { create, clientCreated, logInfo, logWarn, APIError, RateLimitError } =
+  vi.hoisted(() => ({
+    create: vi.fn(),
+    clientCreated: vi.fn(),
+    logInfo: vi.fn(),
+    logWarn: vi.fn(),
+    // o SDK real só tem status quando a resposta HTTP chegou; conexão caída e erro no meio do stream vêm sem
+    APIError: class extends Error {
+      constructor(
+        readonly status: number | undefined,
+        message: string,
+      ) {
+        super(message);
+      }
+    },
+    // o SDK real devolve os cabeçalhos da resposta 429 no erro
+    RateLimitError: class extends Error {
+      constructor(readonly headers: Headers) {
+        super("429 Rate limit reached");
+      }
+    },
+  }));
 
 vi.mock("groq-sdk", () => ({
+  APIError,
   RateLimitError,
   default: class {
     chat = { completions: { create } };
@@ -26,7 +38,9 @@ vi.mock("groq-sdk", () => ({
   },
 }));
 
-vi.mock("@/lib/logger", () => ({ logger: { info: logInfo } }));
+vi.mock("@/lib/logger", () => ({
+  logger: { info: logInfo, warn: logWarn },
+}));
 
 const prompt: Prompt = { system: "regras", user: "fontes e pergunta" };
 
@@ -55,12 +69,17 @@ async function collect(stream: AsyncIterable<string>) {
 }
 
 const model = () =>
-  createGroqAnswerModel({ apiKey: "chave-de-teste", model: "openai/teste" });
+  createGroqAnswerModel({
+    apiKey: "chave-de-teste",
+    model: "openai/teste",
+    retryDelayMs: 0,
+  });
 
 beforeEach(() => {
   create.mockReset();
   clientCreated.mockClear();
   logInfo.mockClear();
+  logWarn.mockClear();
 });
 
 describe("createGroqAnswerModel", () => {
@@ -230,6 +249,82 @@ describe("createGroqAnswerModel", () => {
     await expect(collect(model().stream(prompt))).rejects.toMatchObject({
       cause: original,
     });
+  });
+
+  it("tries once more when Groq fails on its side before the first word", async () => {
+    create
+      .mockRejectedValueOnce(new APIError(503, "503 over capacity"))
+      .mockResolvedValueOnce(chunks(chunk("ok", "stop")));
+
+    expect(await collect(model().stream(prompt))).toEqual(["ok"]);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(logWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it("tries once more when the stream breaks before the first word", async () => {
+    create
+      .mockResolvedValueOnce(
+        (async function* () {
+          yield chunk(null);
+          throw new APIError(undefined, "Connection error.");
+        })(),
+      )
+      .mockResolvedValueOnce(chunks(chunk("ok", "stop")));
+
+    expect(await collect(model().stream(prompt))).toEqual(["ok"]);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after the second failure and reports it", async () => {
+    create
+      .mockRejectedValueOnce(new APIError(500, "500 primeira"))
+      .mockRejectedValueOnce(new APIError(502, "502 segunda"));
+
+    await expect(collect(model().stream(prompt))).rejects.toThrow(
+      "502 segunda",
+    );
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([400, 401, 404])(
+    "does not repeat a request Groq refused with %i, which would fail the same way",
+    async (status) => {
+      create.mockRejectedValue(new APIError(status, `${status} recusado`));
+
+      await expect(collect(model().stream(prompt))).rejects.toThrow(
+        `${status} recusado`,
+      );
+      expect(create).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not repeat a rate limit, which has its own answer for the visitor", async () => {
+    create.mockRejectedValue(
+      new RateLimitError(new Headers({ "retry-after": "3" })),
+    );
+
+    await expect(collect(model().stream(prompt))).rejects.toBeInstanceOf(
+      ModelRateLimitError,
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start over once part of the answer reached the reader", async () => {
+    create.mockResolvedValueOnce(
+      (async function* () {
+        yield chunk("Parte ");
+        throw new APIError(undefined, "stream interrompido");
+      })(),
+    );
+    const received: string[] = [];
+
+    const reading = (async () => {
+      for await (const piece of model().stream(prompt)) received.push(piece);
+    })();
+
+    await expect(reading).rejects.toThrow("stream interrompido");
+    expect(received).toEqual(["Parte "]);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("lets the provider's error reach the caller instead of hiding it", async () => {

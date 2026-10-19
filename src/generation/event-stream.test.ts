@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { encodeSseEvent, toEventStream } from "./event-stream";
-import type { AnswerEvent } from "./generate-answer";
+import type { AskEvent } from "./handle-ask";
 
-async function* eventsOf(...items: AnswerEvent[]) {
+async function* eventsOf(...items: AskEvent[]) {
   yield* items;
 }
 
@@ -25,8 +25,8 @@ describe("encodeSseEvent", () => {
   });
 
   it("round-trips every kind of event through its data line", () => {
-    const events: AnswerEvent[] = [
-      { type: "sources", sources: [] },
+    const events: AskEvent[] = [
+      { type: "sources", sources: [], searchMode: "hybrid" },
       { type: "delta", text: "texto" },
       {
         type: "done",
@@ -37,6 +37,7 @@ describe("encodeSseEvent", () => {
         model: "fake",
         promptVersion: "v1",
         totalTokens: 5_120,
+        queryId: null,
       },
       { type: "error", message: "generation failed", reason: "failed" },
     ];
@@ -86,7 +87,7 @@ describe("toEventStream", () => {
   it("stops the event source when the browser closes the connection", async () => {
     let produced = 0;
     let stopped = false;
-    async function* endless(): AsyncGenerator<AnswerEvent> {
+    async function* endless(): AsyncGenerator<AskEvent> {
       try {
         for (;;) {
           produced += 1;

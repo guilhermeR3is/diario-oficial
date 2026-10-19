@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../../generated/prisma/client";
+import type { GenerationFailure } from "./generate-answer";
 import type { SearchMode } from "./handle-ask";
 
 export type QueryRecord = {
@@ -19,6 +20,21 @@ export async function recordQuery(
 ): Promise<string> {
   const row = await db.queryLog.create({ data: record, select: { id: true } });
   return row.id;
+}
+
+export type FailureRecord = {
+  stage: "search" | "generation";
+  reason: GenerationFailure;
+  detail: string;
+  searchMode: SearchMode;
+  visitorHash: string | null;
+};
+
+export async function recordAskFailure(
+  db: PrismaClient,
+  record: FailureRecord,
+): Promise<void> {
+  await db.askFailure.create({ data: record });
 }
 
 // devolve false quando o id não existe, para a rota responder 404

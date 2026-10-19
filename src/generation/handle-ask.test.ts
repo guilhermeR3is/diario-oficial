@@ -7,6 +7,7 @@ import { NOT_FOUND_ANSWER, PROMPT_VERSION } from "./build-prompt";
 import { createFakeAnswerModel } from "./fake-answer-model";
 import {
   type AskDependencies,
+  type AskFailure,
   type AskRecord,
   type AskEvent,
   type AskOutcome,
@@ -63,6 +64,9 @@ function deps(overrides: Partial<AskDependencies> = {}) {
     closeDay: vi.fn(async () => {}),
     recordQuery: vi.fn<(record: AskRecord) => Promise<string>>(
       async () => QUERY_ID,
+    ),
+    recordFailure: vi.fn<(failure: AskFailure) => Promise<void>>(
+      async () => {},
     ),
     // cada leitura do relógio avança 250 ms, para a latência ser conhecida
     now: () => (clock += 250),
@@ -327,6 +331,101 @@ describe("handleAskRequest", () => {
     });
     expect(broken.recordQuery).not.toHaveBeenCalled();
     expect(broken.closeDay).not.toHaveBeenCalled();
+  });
+
+  it("records a generation failure with its detail and sends the visitor only the reason", async () => {
+    const broken = deps({
+      model: {
+        name: "quebrado",
+        async *stream() {
+          throw new Error("503 over capacity in org_interno");
+        },
+      },
+    });
+
+    const events = await eventsOf(
+      await handleAskRequest(broken, validPayload()),
+    );
+
+    expect(broken.recordFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: "generation",
+      reason: "failed",
+      detail: "503 over capacity in org_interno",
+      searchMode: "hybrid",
+    });
+    expect(events.at(-1)).toEqual({
+      type: "error",
+      message: "generation failed",
+      reason: "failed",
+    });
+    expect(JSON.stringify(events)).not.toContain("org_interno");
+  });
+
+  it("records the daily quota with the provider's message and still closes the day", async () => {
+    const exhausted = deps({
+      model: {
+        name: "limitado",
+        async *stream() {
+          throw new ModelRateLimitError("day", {
+            cause: new Error("tokens per day in org_interno"),
+          });
+        },
+      },
+    });
+
+    const events = await eventsOf(
+      await handleAskRequest(exhausted, validPayload()),
+    );
+
+    expect(exhausted.closeDay).toHaveBeenCalledOnce();
+    expect(exhausted.recordFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: "generation",
+      reason: "quota",
+      detail: "model rate limit reached (day): tokens per day in org_interno",
+      searchMode: "hybrid",
+    });
+    expect(JSON.stringify(events)).not.toContain("org_interno");
+  });
+
+  it("records a search failure before answering 500", async () => {
+    const broken = deps({
+      searchHybrid: failing("conexão com o banco caiu"),
+    });
+
+    const outcome = await handleAskRequest(broken, validPayload());
+
+    expect(outcome.status).toBe(500);
+    expect(broken.recordFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: "search",
+      reason: "failed",
+      detail: "conexão com o banco caiu",
+      searchMode: "hybrid",
+    });
+  });
+
+  it("still tells the visitor about the failure when recording it fails", async () => {
+    const broken = deps({
+      model: rateLimited("minute"),
+      recordFailure: failing("banco fora do ar"),
+    });
+
+    const events = await eventsOf(
+      await handleAskRequest(broken, validPayload()),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: "error",
+      message: "model rate limit reached",
+      reason: "busy",
+    });
+  });
+
+  it("records no failure when the answer comes out", async () => {
+    const working = deps();
+
+    await eventsOf(await handleAskRequest(working, validPayload()));
+
+    expect(working.recordFailure).not.toHaveBeenCalled();
   });
 
   it("answers not found without calling the model when the search finds nothing", async () => {
